@@ -46,9 +46,9 @@
       "id": 4,
       "name": "Hop free list",
       "commit": "2f77540 (run on 8bf44f8)",
-      "run": null,
-      "results": null,
-      "summary": "HopSlotMap keeps a vacant block's other end in the slot itself instead of a side array, so a removal touches fewer cache lines. Pending CI.",
+      "run": "https://github.com/ozzyozbourne/slotmap-mojo/actions/runs/36061009498",
+      "results": "04-2f77540-hop.json",
+      "summary": "HopSlotMap keeps a vacant block's other end in the slot itself instead of a side array, so a removal touches fewer cache lines: 1M-element remove went from 1.43x to 1.02x, and Hop iteration to 0.64-0.68x. This run overlapped the others only briefly. Across rounds, the cases still consistently above 1.2x are DenseSlotMap remove (1.2-1.6x), SecondaryMap insert at 1M (1.4x), dense-map insert at 1K (1.3x), and the two iteration cases that trace to the compiler (dense reductions, iterator loop shape).",
       "changes": [
         "hop-other-end"
       ]
