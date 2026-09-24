@@ -10,7 +10,7 @@ tmp=$(mktemp -d)
 gh run download "$run" -n bench-results -D "$tmp" >/dev/null
 prev=$(ls history/*.json 2>/dev/null | grep -v log.json | sort | tail -1 || true)
 cp "$tmp/results/results.json" "history/$name.json"
-python3 compare.py --rust "$tmp/rust/target/criterion" --mojo "$tmp/results/mojo.csv" \
+python3 compare.py --rust "$tmp/rust/target/criterion" --mojo "$tmp"/results/mojo*.csv \
     --out "$tmp/out" --mode thorough ${prev:+--baseline "$prev"} | sed -n '1,400p'
 echo "saved history/$name.json (baseline was ${prev:-none})"
 rm -rf "$tmp"

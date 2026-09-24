@@ -10,14 +10,19 @@ quick="${SLOTMAP_BENCH_QUICK:-0}"
 mode=$([ "$quick" = 1 ] && echo quick || echo thorough)
 mkdir -p results
 
-echo "== Rust ($mode)"
-rm -rf rust/target/criterion
-(cd rust && cargo bench --bench slotmap -- --noplot $([ "$quick" = 1 ] && echo --quick))
-
-echo "== Mojo ($mode)"
+(cd rust && cargo bench --bench slotmap --no-run 2>&1 | tail -1)
 (cd .. && mojo build -I . bench/mojo/bench_slotmap.mojo -o bench/mojo/bench_slotmap)
-SLOTMAP_BENCH_QUICK="$quick" mojo/bench_slotmap -o results/mojo.csv
+rm -rf rust/target/criterion results/mojo_*.csv
+
+# Rust and Mojo alternate per map, so a drift in the machine's speed during
+# the run lands on both sides of each ratio.
+for map in SlotMap HopSlotMap DenseSlotMap SecondaryMap SparseSecondaryMap; do
+    echo "== Rust $map ($mode)"
+    (cd rust && cargo bench --bench slotmap -- --noplot $([ "$quick" = 1 ] && echo --quick) "^$map/")
+    echo "== Mojo $map ($mode)"
+    SLOTMAP_BENCH_QUICK="$quick" SLOTMAP_BENCH_MAP="$map" mojo/bench_slotmap -o "results/mojo_$map.csv"
+done
 
 echo "== Comparison"
-python3 compare.py --rust rust/target/criterion --mojo results/mojo.csv \
+python3 compare.py --rust rust/target/criterion --mojo results/mojo_*.csv \
     --out results --mode "$mode"

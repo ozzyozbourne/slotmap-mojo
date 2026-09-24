@@ -29,15 +29,16 @@ def rust_results(criterion_dir: Path) -> dict:
     return out
 
 
-def mojo_results(csv_path: Path) -> dict:
+def mojo_results(csv_paths: list) -> dict:
     out = {}
-    with csv_path.open() as f:
-        for row in csv.DictReader(f):
-            m = re.fullmatch(r"(\w+)/(\w+)/input_id:(\d+)", row["name"])
-            if not m:
-                continue
-            n = int(m.group(3))
-            out[(m.group(1), m.group(2), n)] = float(row["met (ms)"]) * 1e6 / n
+    for csv_path in csv_paths:
+        with csv_path.open() as f:
+            for row in csv.DictReader(f):
+                m = re.fullmatch(r"(\w+)/(\w+)/input_id:(\d+)", row["name"])
+                if not m:
+                    continue
+                n = int(m.group(3))
+                out[(m.group(1), m.group(2), n)] = float(row["met (ms)"]) * 1e6 / n
     return out
 
 
@@ -55,7 +56,7 @@ def fmt(ns):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--rust", type=Path, required=True, help="Criterion output dir")
-    ap.add_argument("--mojo", type=Path, required=True, help="Mojo CSV file")
+    ap.add_argument("--mojo", type=Path, nargs="+", required=True, help="Mojo CSV file(s)")
     ap.add_argument("--out", type=Path, required=True)
     ap.add_argument("--mode", default="thorough")
     ap.add_argument("--baseline", type=Path, help="results.json of an earlier run, "

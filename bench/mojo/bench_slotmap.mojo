@@ -7,7 +7,9 @@ excluded from the timing with `Bencher.iter_preproc`, like Criterion's
 `iter_batched`.
 
 Usage: bench_slotmap [-o results.csv]. Set SLOTMAP_BENCH_QUICK=1 for a short
-smoke run.
+smoke run, and SLOTMAP_BENCH_MAP=<map name> to run one map's benchmarks only
+(the runner interleaves Rust and Mojo per map so both see the same machine
+conditions).
 """
 
 from std.benchmark import Bench, BenchConfig, Bencher, BenchId, keep
@@ -308,11 +310,17 @@ def main() raises:
     )
     config.show_progress = False
     var b = Bench(config^)
+    var only = getenv("SLOTMAP_BENCH_MAP")
     var sizes: List[Int] = [1_000, 100_000, 1_000_000]
     for n in sizes:
-        bench_primary[SlotMap[Int]](b, "SlotMap", n)
-        bench_primary[HopSlotMap[Int]](b, "HopSlotMap", n)
-        bench_primary[DenseSlotMap[Int]](b, "DenseSlotMap", n)
-        bench_secondary(b, n)
-        bench_sparse_secondary(b, n)
+        if only == "" or only == "SlotMap":
+            bench_primary[SlotMap[Int]](b, "SlotMap", n)
+        if only == "" or only == "HopSlotMap":
+            bench_primary[HopSlotMap[Int]](b, "HopSlotMap", n)
+        if only == "" or only == "DenseSlotMap":
+            bench_primary[DenseSlotMap[Int]](b, "DenseSlotMap", n)
+        if only == "" or only == "SecondaryMap":
+            bench_secondary(b, n)
+        if only == "" or only == "SparseSecondaryMap":
+            bench_sparse_secondary(b, n)
     b.dump_report()
