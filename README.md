@@ -62,6 +62,11 @@ raw results. Shared runners are noisy, so differences under about 15% are
 not meaningful there. `bench/history/` keeps the results of each CI run, and
 `bench/compare.py --baseline` shows how the Mojo/Rust ratio moved.
 
+The optimization work itself is written up in `docs/optimization-log.html`
+(generated from `bench/history/log.json` by `bench/build_log.py`): every CI
+round with its ratio charts, every technique tried and whether it stayed,
+the issues hit, and what was learned.
+
 Two measurement details matter more than they look:
 - Both benchmarks fold each operation's result into a sum and black-box
   the sum once per pass. Mojo's `keep()` is an inline-asm barrier with a
