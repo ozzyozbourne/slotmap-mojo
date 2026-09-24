@@ -81,9 +81,9 @@
       "id": 7,
       "name": "Growth and spills",
       "commit": "aae44d0",
-      "run": null,
-      "results": null,
-      "summary": "16-slot minimum growth step, the fix for the variadic-max regression it introduced, and DenseSlotMap's single cold growth call with unchecked appends (dense insert 3x faster locally). Queued behind round 6.",
+      "run": "https://github.com/ozzyozbourne/slotmap-mojo/actions/runs/36066003511",
+      "results": "07-aae44d0-growth.json",
+      "summary": "16-slot minimum growth step, the fix for the variadic-max regression it introduced, and DenseSlotMap's single cold growth call with unchecked appends. Dense insert at 1K went 1.74x -> 0.98x and at 100K 1.31x -> 1.15x. The run also carries one-off Mojo-side spikes with unchanged code (SlotMap get at 100K 2.06x where Mojo normally measures about 1.2 ns; SlotMap and dense remove at 1M), the kind of interference the two-pass minimum in round 8 exists to filter.",
       "changes": [
         "min-growth-16",
         "cold-grow",
