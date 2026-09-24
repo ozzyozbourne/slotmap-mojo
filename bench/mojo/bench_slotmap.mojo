@@ -87,10 +87,14 @@ def bench_primary[
     def fresh(mut m: M):
         m = M()
 
+    # Results are folded into a sum that is kept once per pass: `keep()` on
+    # every element is a compiler barrier that spills the map's state each
+    # iteration and dominates the timing.
     def insert_n(mut m: M) {n}:
+        var s = 0
         for i in range(n):
-            var k = m.insert(rebind_var[M.ValueType](i))
-            keep(k)
+            s += Int(m.insert(rebind_var[M.ValueType](i)).data().idx)
+        keep(s)
 
     def bench_insert(mut bencher: Bencher) raises {insert_n}:
         var state = M()
@@ -113,11 +117,12 @@ def bench_primary[
         m = full.copy()
 
     def remove_all(mut m: M) {keys}:
+        var s = 0
         for k in keys:
             # The enclosing `where` clause doesn't reach into closures, so the
             # result is rebound to its concrete type to be droppable.
-            var v = rebind_var[Optional[Int]](m.remove(k))
-            keep(v)
+            s += rebind_var[Optional[Int]](m.remove(k)).or_else(0)
+        keep(s)
 
     def bench_remove(mut bencher: Bencher) raises {refill, remove_all}:
         var state = M()
@@ -181,9 +186,10 @@ def bench_secondary(mut b: Bench, n: Int) raises:
         m = S()
 
     def insert_all(mut m: S) {keys}:
+        var s = 0
         for i in range(len(keys)):
-            var old = m.insert(keys[i], i)
-            keep(old)
+            s += m.insert(keys[i], i).or_else(0)
+        keep(s)
 
     def bench_insert(mut bencher: Bencher) raises {insert_all}:
         var state = S()
@@ -206,9 +212,10 @@ def bench_secondary(mut b: Bench, n: Int) raises:
         m = full.copy()
 
     def remove_all(mut m: S) {keys}:
+        var s = 0
         for k in keys:
-            var v = m.remove(k)
-            keep(v)
+            s += m.remove(k).or_else(0)
+        keep(s)
 
     def bench_remove(mut bencher: Bencher) raises {refill, remove_all}:
         var state = S()
@@ -240,9 +247,10 @@ def bench_sparse_secondary(mut b: Bench, n: Int) raises:
         m = S()
 
     def insert_all(mut m: S) {keys}:
+        var s = 0
         for i in range(len(keys)):
-            var old = m.insert(keys[i], i)
-            keep(old)
+            s += m.insert(keys[i], i).or_else(0)
+        keep(s)
 
     def bench_insert(mut bencher: Bencher) raises {insert_all}:
         var state = S()
@@ -265,9 +273,10 @@ def bench_sparse_secondary(mut b: Bench, n: Int) raises:
         m = full.copy()
 
     def remove_all(mut m: S) {keys}:
+        var s = 0
         for k in keys:
-            var v = m.remove(k)
-            keep(v)
+            s += m.remove(k).or_else(0)
+        keep(s)
 
     def bench_remove(mut bencher: Bencher) raises {refill, remove_all}:
         var state = S()

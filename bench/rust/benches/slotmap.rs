@@ -2,7 +2,9 @@
 //! same workloads in `bench/mojo/bench_slotmap.mojo`; `bench/compare.py`
 //! joins the results.
 //!
-//! Every benchmark times one pass over `n` elements. Setup that must be fresh
+//! Every benchmark times one pass over `n` elements. Per-element results are
+//! folded into a sum that is `black_box`ed once per pass, the same as the
+//! Mojo side; a barrier per element (`keep`/`black_box`) distorts the timing. Setup that must be fresh
 //! for each pass (an empty map to insert into, a full map to remove from) is
 //! excluded from the timing with `iter_batched`. `BatchSize::PerIteration`
 //! runs setup immediately before each timed pass, exactly like Mojo's
@@ -12,7 +14,7 @@
 use std::hint::black_box;
 
 use criterion::{criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion};
-use slotmap::{DefaultKey, DenseSlotMap, HopSlotMap, SecondaryMap, SlotMap, SparseSecondaryMap};
+use slotmap::{DefaultKey, DenseSlotMap, HopSlotMap, Key, SecondaryMap, SlotMap, SparseSecondaryMap};
 use slotmap_bench::shuffle;
 
 const SIZES: [usize; 3] = [1_000, 100_000, 1_000_000];
@@ -45,9 +47,13 @@ macro_rules! primary {
                 b.iter_batched(
                     $map::<DefaultKey, u64>::new,
                     |mut m| {
+                        // Fold results into a sum, as the Mojo benchmark does,
+                        // rather than paying for a barrier per element.
+                        let mut s = 0u64;
                         for i in 0..n as u64 {
-                            black_box(m.insert(i));
+                            s = s.wrapping_add(m.insert(i).data().as_ffi());
                         }
+                        black_box(s);
                         m
                     },
                     BatchSize::PerIteration,
@@ -66,9 +72,11 @@ macro_rules! primary {
                 b.iter_batched(
                     || full.clone(),
                     |mut m| {
+                        let mut s = 0u64;
                         for k in &keys {
-                            black_box(m.remove(*k));
+                            s = s.wrapping_add(m.remove(*k).unwrap_or(0));
                         }
+                        black_box(s);
                         m
                     },
                     BatchSize::PerIteration,
@@ -87,9 +95,13 @@ macro_rules! primary {
                 b.iter_batched(
                     || emptied.clone(),
                     |mut m| {
+                        // Fold results into a sum, as the Mojo benchmark does,
+                        // rather than paying for a barrier per element.
+                        let mut s = 0u64;
                         for i in 0..n as u64 {
-                            black_box(m.insert(i));
+                            s = s.wrapping_add(m.insert(i).data().as_ffi());
                         }
+                        black_box(s);
                         m
                     },
                     BatchSize::PerIteration,
@@ -118,9 +130,11 @@ macro_rules! secondary {
                 b.iter_batched(
                     $new,
                     |mut m| {
+                        let mut s = 0u64;
                         for (i, k) in keys.iter().enumerate() {
-                            black_box(m.insert(*k, i as u64));
+                            s = s.wrapping_add(m.insert(*k, i as u64).unwrap_or(0));
                         }
+                        black_box(s);
                         m
                     },
                     BatchSize::PerIteration,
@@ -139,9 +153,11 @@ macro_rules! secondary {
                 b.iter_batched(
                     || full.clone(),
                     |mut m| {
+                        let mut s = 0u64;
                         for k in &keys {
-                            black_box(m.remove(*k));
+                            s = s.wrapping_add(m.remove(*k).unwrap_or(0));
                         }
+                        black_box(s);
                         m
                     },
                     BatchSize::PerIteration,
