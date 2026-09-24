@@ -11,6 +11,12 @@ on:
   schedule:
     - cron: "0 6 * * 1"  # Mondays 06:00 UTC, thorough.
 
+# Benchmark runs share hosts; running two at once slows both and skews the
+# ratios, so they queue.
+concurrency:
+  group: benchmark
+  cancel-in-progress: false
+
 jobs:
   bench:
     runs-on: macos-latest

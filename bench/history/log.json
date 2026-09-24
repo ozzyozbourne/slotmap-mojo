@@ -35,8 +35,8 @@
       "name": "Honest harness",
       "commit": "c6f0a36",
       "run": "https://github.com/ozzyozbourne/slotmap-mojo/actions/runs/36060253943",
-      "results": null,
-      "summary": "Same library code as round 2. Both benchmarks now fold per-element results into a sum instead of a barrier per element, after finding that Mojo's keep() has a memory clobber that spilled the map's state every iteration.",
+      "results": "03-c6f0a36-harness.json",
+      "summary": "Same library code as round 2. Both benchmarks now fold per-element results into a sum instead of a barrier per element, after finding that Mojo's keep() has a memory clobber that spilled the map's state every iteration. Rounds 2, 3 and 4 ran at the same time on GitHub's runners and both languages measured about 2x slower than in the baseline run; several cases swing both ways between rounds 2 and 3 with identical library code (DenseSlotMap insert 0.69x to 1.54x), so this round's per-case numbers are contaminated. The workflow now queues benchmark runs, and round 5 re-measures this code alone with Rust and Mojo interleaved per map.",
       "changes": [
         "keep-barrier",
         "per-iteration-batching"
@@ -45,12 +45,23 @@
     {
       "id": 4,
       "name": "Hop free list",
-      "commit": "2f77540",
+      "commit": "2f77540 (run on 8bf44f8)",
       "run": null,
       "results": null,
       "summary": "HopSlotMap keeps a vacant block's other end in the slot itself instead of a side array, so a removal touches fewer cache lines. Pending CI.",
       "changes": [
         "hop-other-end"
+      ]
+    },
+    {
+      "id": 5,
+      "name": "Clean re-measure",
+      "commit": "pending",
+      "run": null,
+      "results": null,
+      "summary": "The round-4 code measured alone, with the interleaved runner. Establishes the trustworthy numbers to climb from.",
+      "changes": [
+        "interleaved-runner"
       ]
     }
   ],
@@ -173,6 +184,13 @@
       "status": "not attempted",
       "target": "Insert at small sizes",
       "detail": "Mojo's allocator goes through its own aligned_alloc, so handing its pointers to libc realloc is not known to be safe. A direct measurement showed allocation cost is the same as libc malloc in both languages, so growth is not where the small-size gap comes from."
+    },
+    {
+      "id": "interleaved-runner",
+      "name": "Interleave Rust and Mojo per map",
+      "status": "kept",
+      "target": "Benchmark harness",
+      "detail": "The runner used to run all Rust benchmarks (about 10 minutes) and then all Mojo ones, so any drift in the runner's speed became a Rust-vs-Mojo difference. Now each map's Rust and Mojo benchmarks run back to back."
     }
   ],
   "issues": [
@@ -305,6 +323,11 @@
           "round": 2,
           "title": "CI runners differ 2-4x in absolute speed",
           "detail": "Round 2's VM measured memory-bound operations 2-4x slower than round 1's, for Rust and Mojo alike. Only the Mojo/Rust ratio within one run is comparable across rounds, and a single-run swing on one case still needs a second run before it counts."
+        },
+        {
+          "round": 3,
+          "title": "Never run benchmark jobs concurrently",
+          "detail": "Three CI benchmark runs dispatched together each measured both languages about 2x slower than a lone run, and identical code swung 0.7x to 1.5x between two of them. The runners share hosts. The workflow now serializes benchmark runs, and Rust and Mojo alternate per map inside a run so drift lands on both sides of each ratio."
         }
       ]
     },
