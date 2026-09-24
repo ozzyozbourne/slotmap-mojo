@@ -284,6 +284,13 @@
       "status": "kept",
       "target": "Benchmark harness",
       "detail": "The interleaved suite runs twice inside one CI job and the comparison keeps each case's minimum for each language. A minimum is the estimator least affected by interference on a shared runner."
+    },
+    {
+      "id": "hop-insert-single-pass",
+      "name": "One pass over the freelist in HopSlotMap.insert",
+      "status": "reverted",
+      "target": "HopSlotMap insert/reinsert (1.1-1.25x)",
+      "detail": "Merging _next_key and _commit as was done for SlotMap. Alternating runs: reinsert unchanged (2.42-2.59 ns both ways) and fresh insert slower (2.0 -> 2.85 ns), because the merged path reads the freelist head before finding out the list is empty. Reverted; HopSlotMap (deprecated upstream) stays at 1.1-1.25x on inserts."
     }
   ],
   "issues": [
@@ -508,5 +515,6 @@
         }
       ]
     }
-  ]
+  ],
+  "status": "After eight CI rounds, 56 of the 69 cases are within 20% of Rust or faster, and the sparse map is at or below Rust on all twelve of its cases. Of the thirteen cases above 1.2x, nine are the two iteration patterns the library cannot change (Mojo does not auto-vectorize the sum over a dense map, and its iterator protocol compiles to a loop re-entered per element), two are 1K-element lookups at the noise floor, and two are HopSlotMap inserts, a map deprecated upstream. Every library-side idea that measured better was kept; the ones that did not are listed as reverted or no effect."
 }

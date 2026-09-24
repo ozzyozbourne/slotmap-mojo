@@ -74,6 +74,9 @@ a { color: var(--accent-ink); }
 .eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
 .lede { color: var(--ink-2); margin-top: 12px; }
 .meta { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-top: 14px; font-family: var(--mono); font-size: 12.5px; color: var(--ink-2); }
+#status:not(:empty) { margin-top: 20px; padding: 14px 16px; border-left: 3px solid var(--accent); background: var(--surface); border-radius: 0 6px 6px 0; }
+#status h3 { font-size: 13px; font-family: var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
+#status p { margin-top: 6px; color: var(--ink); max-width: 80ch; }
 .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 28px; }
 .tile { background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 14px 16px; }
 .tile .k { font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
@@ -141,6 +144,7 @@ details > summary { cursor: pointer; color: var(--accent-ink); font-size: 13.5px
     <span id="updated"></span>
   </div>
   <div class="tiles" id="tiles"></div>
+  <div id="status"></div>
 
   <h2>Results by round</h2>
   <p class="note">Each bar is the CI-measured Mojo/Rust ratio of mean time per element. The axis is logarithmic so 0.5&times; and 2&times; sit at equal distance from parity. A grey tick shows the same case in the previous round that has results. Hover a bar for the raw numbers.</p>
@@ -332,6 +336,7 @@ function renderIssues() {
 }
 
 $("#updated").textContent = "generated " + LOG.generated;
+if (LOG.status) $("#status").innerHTML = `<h3>Where it stands</h3><p>${esc(LOG.status)}</p>`;
 renderTiles(); renderButtons(); renderChart(); renderTrend(); renderRounds(); renderTech(); renderLearnings(); renderIssues();
 </script>
 """
