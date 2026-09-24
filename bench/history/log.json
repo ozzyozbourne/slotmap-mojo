@@ -239,6 +239,13 @@
       "status": "kept",
       "target": "Insert at 1K (dense 1.3-1.5x, SlotMap 1.1x)",
       "detail": "Storage doubled from one slot, so the first thousand inserts paid for about ten reallocations per list (three lists in DenseSlotMap). Growth now never adds fewer than 16 slots, like Rust's Vec starting at 4. Alternating before/after runs: dense 1K inserts 3.63 -> 3.41 ns, SlotMap 1.87 -> 1.75 ns. Small, consistent."
+    },
+    {
+      "id": "dense-insert-single-pass",
+      "name": "One pass over the slot in DenseSlotMap.insert",
+      "status": "no effect",
+      "target": "DenseSlotMap insert at 1K/100K (1.3x)",
+      "detail": "The same merge that helped SlotMap.insert: read and write the slot once instead of going through _next_key and _commit. Alternating runs of 1K inserts: 3.41-3.49 ns both ways. The dense map's insert cost is in its three list appends, not the slot bookkeeping. Reverted."
     }
   ],
   "issues": [
