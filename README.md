@@ -59,7 +59,19 @@ pixi run bench-quick  # about 1 minute, rough numbers
 The `Benchmark` workflow runs the thorough suite on a GitHub macOS runner,
 on demand and weekly. It posts the table to the run summary and uploads the
 raw results. Shared runners are noisy, so differences under about 15% are
-not meaningful there.
+not meaningful there. `bench/history/` keeps the results of each CI run, and
+`bench/compare.py --baseline` shows how the Mojo/Rust ratio moved.
+
+Two measurement details matter more than they look:
+- Both benchmarks fold each operation's result into a sum and black-box
+  the sum once per pass. Mojo's `keep()` is an inline-asm barrier with a
+  memory clobber; calling it per element forces the compiler to reload
+  the map's state every iteration and roughly triples the measured cost
+  of an insert.
+- The Rust side uses `BatchSize::PerIteration`, so setup (cloning a full
+  map) runs right before each timed pass, as Mojo's `iter_preproc` does.
+  With larger batches the clones evict each other from cache and the
+  Rust numbers for insert/remove/reinsert come out 2-5x worse.
 
 ## API differences from Rust
 

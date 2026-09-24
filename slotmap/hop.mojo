@@ -25,14 +25,14 @@ struct _FreeListEntry(ImplicitlyCopyable, Writable):
     """Freelist metadata of a vacant slot.
 
     Vacant slots form contiguous blocks. The two ends of a block point at
-    each other with `other_end`, and the front slot of each block is in a
-    doubly linked list of blocks (`next`/`prev`) headed by the sentinel slot
-    0. Only these endpoint fields are kept up to date.
+    each other through the slot's own `next_free` field (see `_oe`), and
+    the front slot of each block is in a doubly linked list of blocks
+    (`next`/`prev`) headed by the sentinel slot 0. Only these endpoint
+    fields are kept up to date.
     """
 
     var next: UInt32
     var prev: UInt32
-    var other_end: UInt32
 
 
 @explicit_destroy(
@@ -86,7 +86,7 @@ struct HopSlotMap[V: Value, K: Key = DefaultKey](
         self._slots = _Slots[Self.V](capacity=capacity + 1)
         self._slots.push_vacant(_Meta(0, 0))
         self._free = List[_FreeListEntry](capacity=capacity + 1)
-        self._free.append(_FreeListEntry(0, 0, 0))
+        self._free.append(_FreeListEntry(0, 0))
         self._num_elems = 0
 
     def deinit_with(deinit self, deinit_func: Some[def(var Self.V)]):
@@ -139,6 +139,14 @@ struct HopSlotMap[V: Value, K: Key = DefaultKey](
         return self._free.unsafe_get(Int(idx))
 
     @inline(.always)
+    def _oe(ref self, idx: UInt32) -> ref[origin_of(self)] UInt32:
+        """The other end of the vacant block `idx` starts or ends. It lives
+        in the slot's `next_free` field, on the slot's own cache line."""
+        return Pointer(
+            to=self._slots.meta(Int(idx)).next_free
+        ).unsafe_origin_cast[origin_of(self)]()[]
+
+    @inline(.always)
     def _occupied(self, idx: Int) -> Bool:
         return self._slots.meta(idx).occupied()
 
@@ -147,7 +155,7 @@ struct HopSlotMap[V: Value, K: Key = DefaultKey](
             abort("HopSlotMap number of elements overflow")
         # We have a contiguous block of vacant slots starting at head. The
         # new element goes into its back slot.
-        var back = self._fl(self._fl(0).next).other_end
+        var back = self._oe(self._fl(0).next)
         if back == 0:
             # Freelist is empty.
             return Self.K(data=KeyData.new(UInt32(len(self._slots)), 1))
@@ -159,7 +167,7 @@ struct HopSlotMap[V: Value, K: Key = DefaultKey](
         var idx = Int(kd.idx)
         if idx == len(self._slots):
             self._slots.push_vacant(_Meta(0, 0))
-            self._free.append(_FreeListEntry(0, 0, 0))
+            self._free.append(_FreeListEntry(0, 0))
         else:
             var front = self._fl(0).next
             var back = kd.idx
@@ -171,8 +179,8 @@ struct HopSlotMap[V: Value, K: Key = DefaultKey](
             else:
                 # Keep using this block, only the other_ends change.
                 var new_back = back - 1
-                self._fl(new_back).other_end = front
-                self._fl(front).other_end = new_back
+                self._oe(new_back) = front
+                self._oe(front) = new_back
         self._slots.write(idx, value^)
         self._slots.meta(idx).version = kd.version
         self._num_elems += 1
@@ -217,32 +225,37 @@ struct HopSlotMap[V: Value, K: Key = DefaultKey](
             var old_tail = self._fl(0).prev
             self._fl(0).prev = i
             self._fl(old_tail).next = i
-            self._fl(i) = _FreeListEntry(0, old_tail, i)
+            self._fl(i) = _FreeListEntry(0, old_tail)
+            self._oe(i) = i
         elif not left_vacant and right_vacant:
             # Prepend to the vacant block on the right. Since the start of
             # that block moved, update the pointers to it.
             var front_data = self._fl(i + 1)
-            self._fl(front_data.other_end).other_end = i
+            var back = self._oe(i + 1)
+            self._oe(back) = i
             self._fl(front_data.prev).next = i
             self._fl(front_data.next).prev = i
             self._fl(i) = front_data
+            self._oe(i) = back
         elif left_vacant and not right_vacant:
             # Append to the vacant block on the left.
-            var front = self._fl(i - 1).other_end
-            self._fl(front).other_end = i
-            self._fl(i) = _FreeListEntry(0, 0, front)
+            var front = self._oe(i - 1)
+            self._oe(front) = i
+            self._fl(i) = _FreeListEntry(0, 0)
+            self._oe(i) = front
         else:
             # Merge the blocks on the left and right. First snip the right
             # block out of the freelist.
             var right = self._fl(i + 1)
+            var back = self._oe(i + 1)
             self._fl(right.prev).next = right.next
             self._fl(right.next).prev = right.prev
             # Then update the endpoints.
-            var front = self._fl(i - 1).other_end
-            var back = right.other_end
-            self._fl(front).other_end = back
-            self._fl(back).other_end = front
-            self._fl(i) = _FreeListEntry(0, 0, 0)
+            var front = self._oe(i - 1)
+            self._oe(front) = back
+            self._oe(back) = front
+            self._fl(i) = _FreeListEntry(0, 0)
+            self._oe(i) = 0
 
         self._num_elems -= 1
         return value^
@@ -259,10 +272,10 @@ struct HopSlotMap[V: Value, K: Key = DefaultKey](
             return 0
         if self._occupied(idx + 1):
             return idx + 1
-        return Int(self._fl(UInt32(idx + 1)).other_end) + 1
+        return Int(self._oe(UInt32(idx + 1))) + 1
 
     def _first(self) -> Int:
-        return Int(self._fl(0).other_end) + 1
+        return Int(self._oe(0)) + 1
 
     def retain(
         mut self, f: Some[def(Self.K, mut Self.V) -> Bool]
@@ -397,9 +410,6 @@ struct HopSlotMap[V: Value, K: Key = DefaultKey](
         vacant slots. Values are mutable if `self` is."""
         return {
             self._slots.slots_ptr().unsafe_origin_cast[origin_of(self)](),
-            self._free.unsafe_ptr()
-            .unsafe_mut_cast[False]()
-            .unsafe_origin_cast[ImmUntrackedOrigin](),
             self._first(),
             len(self),
         }
@@ -443,7 +453,6 @@ struct _HopIter[
     ]: Iterator = Self
 
     var _slots: Pointer[_RawSlot[Self.V], Self.origin]
-    var _free: Pointer[_FreeListEntry, ImmUntrackedOrigin]
     var _cur: Int
     var _num_left: Int
 
@@ -456,8 +465,9 @@ struct _HopIter[
             raise StopIteration()
         self._num_left -= 1
         var idx = self._cur
-        if not self._slots[unsafe_offset=idx].meta.occupied():
-            idx = Int(self._free[unsafe_offset=idx].other_end) + 1
+        ref meta = self._slots[unsafe_offset=idx].meta
+        if not meta.occupied():
+            idx = Int(meta.next_free) + 1  # Hop over the vacant block.
         self._cur = idx + 1
         ref slot = self._slots[unsafe_offset=idx]
         return Item(
