@@ -117,29 +117,44 @@ struct DenseSlotMap[V: Value, K: Key = DefaultKey](
             abort("DenseSlotMap is full")
         return Self.K(data=KeyData.new(UInt32(len(self._slots)), 1))
 
-    def _commit(mut self, key: Self.K, var value: Self.V):
-        var kd = key.data()
-        var idx = Int(kd.idx)
-        # Grow the two dense lists together, never by less than 16, so the
-        # first thousand inserts do not pay for a dozen small reallocations.
+    @inline(.never)
+    def _grow(mut self):
+        """Makes room for one more element in every list. Cold and never
+        inlined: three reallocation call sites inside the insert loop made
+        the compiler spill the loop's state to the stack on every insert."""
         var n = len(self._keys)
         if n == self._values.capacity():
             var cap = max(2 * n, 16)
             self._values.reserve(cap)
             self._keys.reserve(cap)
-        self._values.append(value^)
-        self._keys.append(key)
-        var dense_idx = UInt32(len(self._keys) - 1)
+        if len(self._slots) == self._slots.capacity():
+            self._slots.reserve(max(2 * len(self._slots), 16))
+
+    def _commit(mut self, key: Self.K, var value: Self.V):
+        var kd = key.data()
+        var idx = Int(kd.idx)
+        var n = len(self._keys)
+        # `_keys` and `_values` always share length and capacity.
+        if n == self._values.capacity() or len(self._slots) == self._slots.capacity():
+            self._grow()
+        # Unchecked appends: capacity was just ensured.
+        self._values.unsafe_ptr().unsafe_offset(n).unsafe_write(value^)
+        self._values._len = n + 1
+        self._keys.unsafe_ptr().unsafe_offset(n).unsafe_write(key)
+        self._keys._len = n + 1
+        var dense_idx = UInt32(n)
         if idx < len(self._slots):
             ref slot = self._slots.unsafe_get(idx)
             self._free_head = slot.next_free
             slot.next_free = dense_idx
             slot.version = kd.version
         else:
-            if len(self._slots) == self._slots.capacity():
-                self._slots.reserve(max(2 * len(self._slots), 16))
-            self._slots.append(_Meta(kd.version, dense_idx))
-            self._free_head = UInt32(len(self._slots))
+            var m = len(self._slots)
+            self._slots.unsafe_ptr().unsafe_offset(m).unsafe_write(
+                _Meta(kd.version, dense_idx)
+            )
+            self._slots._len = m + 1
+            self._free_head = UInt32(m + 1)
 
     def insert(mut self, var value: Self.V) -> Self.K:
         """Inserts a value, returning its unique key."""
