@@ -386,7 +386,9 @@ struct _Slots[V: Value](
         # Never grow by less than 16 slots: doubling from one slot costs a
         # dozen reallocations for the first thousand inserts.
         if min_capacity > self.capacity():
-            self.reserve(max(2 * self.capacity(), min_capacity, 16))
+            # Nested two-argument max on purpose: the variadic max() nearly
+            # doubled the cost of every insert, not just the growing ones.
+            self.reserve(max(max(2 * self.capacity(), min_capacity), 16))
 
     def push_vacant(mut self, meta: _Meta):
         """Appends a slot, which must be vacant (even version)."""
