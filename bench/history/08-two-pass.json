@@ -1,0 +1,493 @@
+{
+  "env": {
+    "machine": "Apple M1 (Virtual) (Darwin arm64)",
+    "rustc": "rustc 1.98.1 (48a229cea 2026-09-01)",
+    "mojo": "Mojo 1.2.0.dev2026092305 (eea89a4d)",
+    "mode": "thorough"
+  },
+  "results": [
+    {
+      "map": "SlotMap",
+      "op": "insert",
+      "n": 1000,
+      "rust_ns_per_elem": 2.999773172042842,
+      "mojo_ns_per_elem": 2.8664967157871035
+    },
+    {
+      "map": "SlotMap",
+      "op": "insert",
+      "n": 100000,
+      "rust_ns_per_elem": 2.7198760826980406,
+      "mojo_ns_per_elem": 3.1642080805473083
+    },
+    {
+      "map": "SlotMap",
+      "op": "insert",
+      "n": 1000000,
+      "rust_ns_per_elem": 3.4297437709090905,
+      "mojo_ns_per_elem": 3.0353671970624236
+    },
+    {
+      "map": "SlotMap",
+      "op": "get",
+      "n": 1000,
+      "rust_ns_per_elem": 0.5831667197113338,
+      "mojo_ns_per_elem": 0.8429004413276626
+    },
+    {
+      "map": "SlotMap",
+      "op": "get",
+      "n": 100000,
+      "rust_ns_per_elem": 0.9885312114886037,
+      "mojo_ns_per_elem": 1.1115303215303216
+    },
+    {
+      "map": "SlotMap",
+      "op": "get",
+      "n": 1000000,
+      "rust_ns_per_elem": 5.120175045555556,
+      "mojo_ns_per_elem": 5.869508997429306
+    },
+    {
+      "map": "SlotMap",
+      "op": "remove",
+      "n": 1000,
+      "rust_ns_per_elem": 0.8888289552568677,
+      "mojo_ns_per_elem": 0.9776802022415972
+    },
+    {
+      "map": "SlotMap",
+      "op": "remove",
+      "n": 100000,
+      "rust_ns_per_elem": 1.4460687258742397,
+      "mojo_ns_per_elem": 1.2996937975817289
+    },
+    {
+      "map": "SlotMap",
+      "op": "remove",
+      "n": 1000000,
+      "rust_ns_per_elem": 5.82398615375,
+      "mojo_ns_per_elem": 5.452054054054054
+    },
+    {
+      "map": "SlotMap",
+      "op": "iter_half",
+      "n": 1000,
+      "rust_ns_per_elem": 0.703771215923222,
+      "mojo_ns_per_elem": 0.8721966693100713
+    },
+    {
+      "map": "SlotMap",
+      "op": "iter_half",
+      "n": 100000,
+      "rust_ns_per_elem": 3.3871042487065592,
+      "mojo_ns_per_elem": 3.857997769990443
+    },
+    {
+      "map": "SlotMap",
+      "op": "iter_half",
+      "n": 1000000,
+      "rust_ns_per_elem": 3.480655720666666,
+      "mojo_ns_per_elem": 4.004006677796327
+    },
+    {
+      "map": "SlotMap",
+      "op": "reinsert",
+      "n": 1000,
+      "rust_ns_per_elem": 2.4987711088089357,
+      "mojo_ns_per_elem": 2.5222493349271766
+    },
+    {
+      "map": "SlotMap",
+      "op": "reinsert",
+      "n": 100000,
+      "rust_ns_per_elem": 9.378412737674019,
+      "mojo_ns_per_elem": 9.63498284734134
+    },
+    {
+      "map": "SlotMap",
+      "op": "reinsert",
+      "n": 1000000,
+      "rust_ns_per_elem": 92.33857626000001,
+      "mojo_ns_per_elem": 101.5725806451613
+    },
+    {
+      "map": "HopSlotMap",
+      "op": "insert",
+      "n": 1000,
+      "rust_ns_per_elem": 3.3591360136113053,
+      "mojo_ns_per_elem": 3.8043768054932747
+    },
+    {
+      "map": "HopSlotMap",
+      "op": "insert",
+      "n": 100000,
+      "rust_ns_per_elem": 2.776521526460959,
+      "mojo_ns_per_elem": 3.3609007633587784
+    },
+    {
+      "map": "HopSlotMap",
+      "op": "insert",
+      "n": 1000000,
+      "rust_ns_per_elem": 4.975192519999999,
+      "mojo_ns_per_elem": 3.217561662198391
+    },
+    {
+      "map": "HopSlotMap",
+      "op": "get",
+      "n": 1000,
+      "rust_ns_per_elem": 0.6133938011404516,
+      "mojo_ns_per_elem": 0.8434199670497159
+    },
+    {
+      "map": "HopSlotMap",
+      "op": "get",
+      "n": 100000,
+      "rust_ns_per_elem": 1.074312207728259,
+      "mojo_ns_per_elem": 1.0461011612692181
+    },
+    {
+      "map": "HopSlotMap",
+      "op": "get",
+      "n": 1000000,
+      "rust_ns_per_elem": 6.20505030625,
+      "mojo_ns_per_elem": 5.250027659574467
+    },
+    {
+      "map": "HopSlotMap",
+      "op": "remove",
+      "n": 1000,
+      "rust_ns_per_elem": 2.228556995998497,
+      "mojo_ns_per_elem": 2.491002892257691
+    },
+    {
+      "map": "HopSlotMap",
+      "op": "remove",
+      "n": 100000,
+      "rust_ns_per_elem": 7.67689127533853,
+      "mojo_ns_per_elem": 8.554219957835558
+    },
+    {
+      "map": "HopSlotMap",
+      "op": "remove",
+      "n": 1000000,
+      "rust_ns_per_elem": 17.925117789999998,
+      "mojo_ns_per_elem": 19.953831858407078
+    },
+    {
+      "map": "HopSlotMap",
+      "op": "iter_half",
+      "n": 1000,
+      "rust_ns_per_elem": 0.9547600552395791,
+      "mojo_ns_per_elem": 0.9636957100188654
+    },
+    {
+      "map": "HopSlotMap",
+      "op": "iter_half",
+      "n": 100000,
+      "rust_ns_per_elem": 1.9910233481100335,
+      "mojo_ns_per_elem": 2.1791160730762136
+    },
+    {
+      "map": "HopSlotMap",
+      "op": "iter_half",
+      "n": 1000000,
+      "rust_ns_per_elem": 2.6374941249999995,
+      "mojo_ns_per_elem": 2.5037154471544714
+    },
+    {
+      "map": "HopSlotMap",
+      "op": "reinsert",
+      "n": 1000,
+      "rust_ns_per_elem": 2.333138218136326,
+      "mojo_ns_per_elem": 2.8543968191559985
+    },
+    {
+      "map": "HopSlotMap",
+      "op": "reinsert",
+      "n": 100000,
+      "rust_ns_per_elem": 2.478624989695142,
+      "mojo_ns_per_elem": 3.0053210358283073
+    },
+    {
+      "map": "HopSlotMap",
+      "op": "reinsert",
+      "n": 1000000,
+      "rust_ns_per_elem": 2.460688804166667,
+      "mojo_ns_per_elem": 3.078843675417661
+    },
+    {
+      "map": "DenseSlotMap",
+      "op": "insert",
+      "n": 1000,
+      "rust_ns_per_elem": 3.9789003558685447,
+      "mojo_ns_per_elem": 4.051704143990594
+    },
+    {
+      "map": "DenseSlotMap",
+      "op": "insert",
+      "n": 100000,
+      "rust_ns_per_elem": 2.9272657157254196,
+      "mojo_ns_per_elem": 3.349996050032917
+    },
+    {
+      "map": "DenseSlotMap",
+      "op": "insert",
+      "n": 1000000,
+      "rust_ns_per_elem": 6.8752444312500005,
+      "mojo_ns_per_elem": 3.4893570432357044
+    },
+    {
+      "map": "DenseSlotMap",
+      "op": "get",
+      "n": 1000,
+      "rust_ns_per_elem": 0.6393147526419282,
+      "mojo_ns_per_elem": 0.7173743640163972
+    },
+    {
+      "map": "DenseSlotMap",
+      "op": "get",
+      "n": 100000,
+      "rust_ns_per_elem": 1.7812129039521358,
+      "mojo_ns_per_elem": 1.5316523677632912
+    },
+    {
+      "map": "DenseSlotMap",
+      "op": "get",
+      "n": 1000000,
+      "rust_ns_per_elem": 13.151845609999999,
+      "mojo_ns_per_elem": 10.613703056768559
+    },
+    {
+      "map": "DenseSlotMap",
+      "op": "remove",
+      "n": 1000,
+      "rust_ns_per_elem": 1.9152640575819146,
+      "mojo_ns_per_elem": 1.7289304563541614
+    },
+    {
+      "map": "DenseSlotMap",
+      "op": "remove",
+      "n": 100000,
+      "rust_ns_per_elem": 3.9889467875830613,
+      "mojo_ns_per_elem": 3.773127158084372
+    },
+    {
+      "map": "DenseSlotMap",
+      "op": "remove",
+      "n": 1000000,
+      "rust_ns_per_elem": 22.70114929666666,
+      "mojo_ns_per_elem": 14.8503591160221
+    },
+    {
+      "map": "DenseSlotMap",
+      "op": "iter_half",
+      "n": 1000,
+      "rust_ns_per_elem": 0.03597832541105677,
+      "mojo_ns_per_elem": 0.2029065
+    },
+    {
+      "map": "DenseSlotMap",
+      "op": "iter_half",
+      "n": 100000,
+      "rust_ns_per_elem": 0.061653690161198454,
+      "mojo_ns_per_elem": 0.21821665230932344
+    },
+    {
+      "map": "DenseSlotMap",
+      "op": "iter_half",
+      "n": 1000000,
+      "rust_ns_per_elem": 0.07023394369671003,
+      "mojo_ns_per_elem": 0.20280407255304583
+    },
+    {
+      "map": "DenseSlotMap",
+      "op": "reinsert",
+      "n": 1000,
+      "rust_ns_per_elem": 3.5625771380349414,
+      "mojo_ns_per_elem": 2.6591954263834325
+    },
+    {
+      "map": "DenseSlotMap",
+      "op": "reinsert",
+      "n": 100000,
+      "rust_ns_per_elem": 11.713495415873362,
+      "mojo_ns_per_elem": 8.843199294532628
+    },
+    {
+      "map": "DenseSlotMap",
+      "op": "reinsert",
+      "n": 1000000,
+      "rust_ns_per_elem": 107.61804501,
+      "mojo_ns_per_elem": 64.16017500000001
+    },
+    {
+      "map": "SecondaryMap",
+      "op": "insert",
+      "n": 1000,
+      "rust_ns_per_elem": 3.501787179699898,
+      "mojo_ns_per_elem": 2.1916193445877457
+    },
+    {
+      "map": "SecondaryMap",
+      "op": "insert",
+      "n": 100000,
+      "rust_ns_per_elem": 3.161369209914881,
+      "mojo_ns_per_elem": 2.014783405000796
+    },
+    {
+      "map": "SecondaryMap",
+      "op": "insert",
+      "n": 1000000,
+      "rust_ns_per_elem": 7.469426808333331,
+      "mojo_ns_per_elem": 8.913098245614036
+    },
+    {
+      "map": "SecondaryMap",
+      "op": "get",
+      "n": 1000,
+      "rust_ns_per_elem": 0.8768452727931217,
+      "mojo_ns_per_elem": 0.7923590747518043
+    },
+    {
+      "map": "SecondaryMap",
+      "op": "get",
+      "n": 100000,
+      "rust_ns_per_elem": 1.2532587673460434,
+      "mojo_ns_per_elem": 1.1923326572008115
+    },
+    {
+      "map": "SecondaryMap",
+      "op": "get",
+      "n": 1000000,
+      "rust_ns_per_elem": 6.99911500142857,
+      "mojo_ns_per_elem": 6.202633952254642
+    },
+    {
+      "map": "SecondaryMap",
+      "op": "remove",
+      "n": 1000,
+      "rust_ns_per_elem": 0.8761454787764772,
+      "mojo_ns_per_elem": 0.891137245280143
+    },
+    {
+      "map": "SecondaryMap",
+      "op": "remove",
+      "n": 100000,
+      "rust_ns_per_elem": 1.441067430196013,
+      "mojo_ns_per_elem": 1.2746931255921676
+    },
+    {
+      "map": "SecondaryMap",
+      "op": "remove",
+      "n": 1000000,
+      "rust_ns_per_elem": 7.492441188571432,
+      "mojo_ns_per_elem": 5.698146282973621
+    },
+    {
+      "map": "SecondaryMap",
+      "op": "iter",
+      "n": 1000,
+      "rust_ns_per_elem": 0.5148993245826986,
+      "mojo_ns_per_elem": 0.6536651889077754
+    },
+    {
+      "map": "SecondaryMap",
+      "op": "iter",
+      "n": 100000,
+      "rust_ns_per_elem": 0.34767089705861,
+      "mojo_ns_per_elem": 0.6551263479365422
+    },
+    {
+      "map": "SecondaryMap",
+      "op": "iter",
+      "n": 1000000,
+      "rust_ns_per_elem": 0.4390511080939099,
+      "mojo_ns_per_elem": 0.6714641122504047
+    },
+    {
+      "map": "SparseSecondaryMap",
+      "op": "insert",
+      "n": 1000,
+      "rust_ns_per_elem": 24.74226937031803,
+      "mojo_ns_per_elem": 20.62968688632812
+    },
+    {
+      "map": "SparseSecondaryMap",
+      "op": "insert",
+      "n": 100000,
+      "rust_ns_per_elem": 19.907946949460356,
+      "mojo_ns_per_elem": 16.97021306818182
+    },
+    {
+      "map": "SparseSecondaryMap",
+      "op": "insert",
+      "n": 1000000,
+      "rust_ns_per_elem": 34.480455005,
+      "mojo_ns_per_elem": 30.379930555555557
+    },
+    {
+      "map": "SparseSecondaryMap",
+      "op": "get",
+      "n": 1000,
+      "rust_ns_per_elem": 3.172323727509135,
+      "mojo_ns_per_elem": 2.582354676332275
+    },
+    {
+      "map": "SparseSecondaryMap",
+      "op": "get",
+      "n": 100000,
+      "rust_ns_per_elem": 4.5888747054916355,
+      "mojo_ns_per_elem": 3.928396336386345
+    },
+    {
+      "map": "SparseSecondaryMap",
+      "op": "get",
+      "n": 1000000,
+      "rust_ns_per_elem": 16.55259750333333,
+      "mojo_ns_per_elem": 12.70203867403315
+    },
+    {
+      "map": "SparseSecondaryMap",
+      "op": "remove",
+      "n": 1000,
+      "rust_ns_per_elem": 5.976847418205309,
+      "mojo_ns_per_elem": 3.4420028279364314
+    },
+    {
+      "map": "SparseSecondaryMap",
+      "op": "remove",
+      "n": 100000,
+      "rust_ns_per_elem": 15.337152782027383,
+      "mojo_ns_per_elem": 4.010530215708875
+    },
+    {
+      "map": "SparseSecondaryMap",
+      "op": "remove",
+      "n": 1000000,
+      "rust_ns_per_elem": 28.131617515000002,
+      "mojo_ns_per_elem": 12.951313725490197
+    },
+    {
+      "map": "SparseSecondaryMap",
+      "op": "iter",
+      "n": 1000,
+      "rust_ns_per_elem": 0.856378487855383,
+      "mojo_ns_per_elem": 0.8140068278830022
+    },
+    {
+      "map": "SparseSecondaryMap",
+      "op": "iter",
+      "n": 100000,
+      "rust_ns_per_elem": 1.98427242901083,
+      "mojo_ns_per_elem": 1.735288928098809
+    },
+    {
+      "map": "SparseSecondaryMap",
+      "op": "iter",
+      "n": 1000000,
+      "rust_ns_per_elem": 3.358163302142858,
+      "mojo_ns_per_elem": 2.542495744680851
+    }
+  ]
+}
