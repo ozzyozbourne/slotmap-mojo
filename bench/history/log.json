@@ -55,13 +55,23 @@
     },
     {
       "id": 5,
+      "name": "Clean re-measure",
+      "commit": "cf2aafb (library code of 2f77540)",
+      "run": "https://github.com/ozzyozbourne/slotmap-mojo/actions/runs/36063195656",
+      "results": "05-2f77540-clean.json",
+      "summary": "The round-4 library code measured alone with the interleaved runner: the trustworthy reference. It agrees with round 4 on the large sizes. Still above 1.2x: DenseSlotMap remove at 1K (1.49x) and insert at 1K/100K (1.38x/1.26x), SecondaryMap insert at 1M (1.46x), the two compiler-bound iteration cases, and a scatter of 1K-element lookups where Mojo's cost does not drop below about 1.1 ns while Rust's does (SlotMap get at 1K: 1.49x). Round 6 carries the fixes for dense remove and the 1M secondary insert.",
+      "changes": [
+        "interleaved-runner"
+      ]
+    },
+    {
+      "id": 6,
       "name": "Assertions and memset",
-      "commit": "pending",
+      "commit": "cd5bcf6",
       "run": null,
       "results": null,
-      "summary": "Measured alone with the interleaved runner. Adds the raw-pointer swap-remove for DenseSlotMap (no bounds-checked pop in the hot path), a memset for SecondaryMap's vacant extension, and benchmark closures that no longer index with a bounds check.",
+      "summary": "Raw-pointer swap-remove for DenseSlotMap (no bounds-checked pop in the hot path), a memset for SecondaryMap's vacant extension, and benchmark closures that no longer index with a bounds check. Queued behind round 5.",
       "changes": [
-        "interleaved-runner",
         "no-pop-in-hot-path",
         "memset-vacant",
         "bench-no-indexing"
@@ -376,6 +386,11 @@
           "round": 3,
           "title": "Never run benchmark jobs concurrently",
           "detail": "Three CI benchmark runs dispatched together each measured both languages about 2x slower than a lone run, and identical code swung 0.7x to 1.5x between two of them. The runners share hosts. The workflow now serializes benchmark runs, and Rust and Mojo alternate per map inside a run so drift lands on both sides of each ratio."
+        },
+        {
+          "round": 5,
+          "title": "1K-element cases wobble between runs",
+          "detail": "With identical library code, SlotMap get at 1K read 1.15x, 1.28x and 1.49x across three runs while the 100K and 1M cases held within a few percent. A 1K pass is about a microsecond; treat 1K ratios as coarse and confirm them at 100K."
         }
       ]
     },
