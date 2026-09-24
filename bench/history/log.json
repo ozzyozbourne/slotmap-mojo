@@ -76,6 +76,19 @@
         "memset-vacant",
         "bench-no-indexing"
       ]
+    },
+    {
+      "id": 7,
+      "name": "Growth and spills",
+      "commit": "aae44d0",
+      "run": null,
+      "results": null,
+      "summary": "16-slot minimum growth step, the fix for the variadic-max regression it introduced, and DenseSlotMap's single cold growth call with unchecked appends (dense insert 3x faster locally). Queued behind round 6.",
+      "changes": [
+        "min-growth-16",
+        "cold-grow",
+        "dense-insert-single-pass"
+      ]
     }
   ],
   "techniques": [
@@ -287,6 +300,10 @@
     {
       "title": "Timer resolution at 1K elements",
       "detail": "perf_counter_ns reports microsecond steps on this Mac, so 1K-element local numbers are quantized to 1 ns per element. Local numbers guide direction only; CI numbers decide."
+    },
+    {
+      "title": "A one-line growth tweak halved SlotMap insert speed",
+      "detail": "The 16-slot minimum was first written with a three-argument max() and nearly doubled the cost of every insert. Only an alternating before/after micro-benchmark against the previous commit exposed it; local single runs are too noisy to notice a 2x change reliably at these sizes."
     }
   ],
   "findings": [
