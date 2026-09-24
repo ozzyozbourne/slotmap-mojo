@@ -487,6 +487,26 @@
           "detail": "A Mojo constant-folding bug, already reported upstream (#7154)."
         }
       ]
+    },
+    {
+      "group": "What this says about Mojo vs Rust",
+      "items": [
+        {
+          "round": 6,
+          "title": "MLIR does not make scalar code faster",
+          "detail": "A slot map is pointer chasing, branches and small loads and stores. Both toolchains hand that to LLVM, and LLVM produces the same loops for both (13 vs 14 instructions for get, 9 vs 10 for iteration). MLIR is where higher-level structure (tensors, tiling, GPU kernels, compile-time specialization) is expressed and lowered; it has no say in ldr/cmp/branch code. Parity was the ceiling here, not a disappointment."
+        },
+        {
+          "round": 6,
+          "title": "The gaps found are maturity, not architecture",
+          "detail": "No auto-vectorization of reductions, iterator loops not fused with their consumer, default-on assertion messages hoisted into hot loops, spills caused by inlined reallocation call sites, a memory-clobbering keep(), a hasher routed through vector registers. Each is an optimization pass or a library choice that Rust's ecosystem has had a decade to polish, and none is a limit of the MLIR design."
+        },
+        {
+          "round": 6,
+          "title": "Where Mojo's extra tricks would show, this workload does not go",
+          "detail": "Compile-time specialization on traits (used here for destruction and growth), explicit SIMD with parametric widths, and one source targeting CPU and GPU are where Mojo can beat Rust. A hash map exercises none of them. The wins the port did get (sparse removal 0.25-0.5x, dense insert and lookup at 1M 0.6-0.7x) came from data-structure design and would be available to Rust with the same care."
+        }
+      ]
     }
   ]
 }
