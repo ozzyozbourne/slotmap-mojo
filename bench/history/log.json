@@ -17,8 +17,8 @@
       "name": "Layout and growth",
       "commit": "660560d",
       "run": "https://github.com/ozzyozbourne/slotmap-mojo/actions/runs/36059220385",
-      "results": null,
-      "summary": "Interleaved slot metadata with values, amortized growth for SecondaryMap, a single swap-remove for DenseSlotMap, a straight-line fast path in the iterators, and SparseSecondaryMap rewritten as a Swiss table with a register-only hasher. Measured with the original harness, so insert/remove numbers still carry the keep() overhead found in round 3.",
+      "results": "02-660560d-layout.json",
+      "summary": "Interleaved slot metadata with values, amortized growth for SecondaryMap, a single swap-remove for DenseSlotMap, a straight-line fast path in the iterators, and SparseSecondaryMap rewritten as a Swiss table with a register-only hasher. Measured with the original Mojo harness (keep() per element), so Mojo insert/remove still carry that overhead. This runner was 2-4x slower than the baseline's in absolute terms on both sides, so compare ratios, not nanoseconds, and read single-case swings such as DenseSlotMap remove at 1M as noise until confirmed.",
       "changes": [
         "interleave",
         "sec-growth",
@@ -300,6 +300,11 @@
           "round": 1,
           "title": "Local 1K numbers are quantized",
           "detail": "The timer steps in microseconds, so local runs at 1K elements resolve to 1 ns per element. Local runs pick directions; CI decides."
+        },
+        {
+          "round": 2,
+          "title": "CI runners differ 2-4x in absolute speed",
+          "detail": "Round 2's VM measured memory-bound operations 2-4x slower than round 1's, for Rust and Mojo alike. Only the Mojo/Rust ratio within one run is comparable across rounds, and a single-run swing on one case still needs a second run before it counts."
         }
       ]
     },
