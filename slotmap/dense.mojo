@@ -120,6 +120,13 @@ struct DenseSlotMap[V: Value, K: Key = DefaultKey](
     def _commit(mut self, key: Self.K, var value: Self.V):
         var kd = key.data()
         var idx = Int(kd.idx)
+        # Grow the two dense lists together, never by less than 16, so the
+        # first thousand inserts do not pay for a dozen small reallocations.
+        var n = len(self._keys)
+        if n == self._values.capacity():
+            var cap = max(2 * n, 16)
+            self._values.reserve(cap)
+            self._keys.reserve(cap)
         self._values.append(value^)
         self._keys.append(key)
         var dense_idx = UInt32(len(self._keys) - 1)
@@ -129,6 +136,8 @@ struct DenseSlotMap[V: Value, K: Key = DefaultKey](
             slot.next_free = dense_idx
             slot.version = kd.version
         else:
+            if len(self._slots) == self._slots.capacity():
+                self._slots.reserve(max(2 * len(self._slots), 16))
             self._slots.append(_Meta(kd.version, dense_idx))
             self._free_head = UInt32(len(self._slots))
 

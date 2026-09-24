@@ -383,8 +383,10 @@ struct _Slots[V: Value](
 
     @inline(.always)
     def _grow_amortized(mut self, min_capacity: Int):
+        # Never grow by less than 16 slots: doubling from one slot costs a
+        # dozen reallocations for the first thousand inserts.
         if min_capacity > self.capacity():
-            self.reserve(max(2 * self.capacity(), min_capacity))
+            self.reserve(max(2 * self.capacity(), min_capacity, 16))
 
     def push_vacant(mut self, meta: _Meta):
         """Appends a slot, which must be vacant (even version)."""

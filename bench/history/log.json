@@ -222,6 +222,13 @@
       "status": "kept",
       "target": "Benchmark harness (Mojo side)",
       "detail": "The secondary-map closures indexed the key list with keys[i]; that bounds check's abort setup is hoisted into the loop just like List.pop's. They iterate the list directly now, matching Rust's enumerate()."
+    },
+    {
+      "id": "min-growth-16",
+      "name": "16-slot minimum growth step",
+      "status": "kept",
+      "target": "Insert at 1K (dense 1.3-1.5x, SlotMap 1.1x)",
+      "detail": "Storage doubled from one slot, so the first thousand inserts paid for about ten reallocations per list (three lists in DenseSlotMap). Growth now never adds fewer than 16 slots, like Rust's Vec starting at 4. Alternating before/after runs: dense 1K inserts 3.63 -> 3.41 ns, SlotMap 1.87 -> 1.75 ns. Small, consistent."
     }
   ],
   "issues": [
