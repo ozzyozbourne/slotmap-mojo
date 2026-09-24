@@ -1,6 +1,12 @@
 """Pieces shared by the slot map implementations."""
 
-from std.memory import Allocation, Layout, dealloc, unsafe_memcpy
+from std.memory import (
+    Allocation,
+    Layout,
+    dealloc,
+    unsafe_memcpy,
+    unsafe_memset_zero,
+)
 from std.traits import (
     IsTriviallyCopyable,
     IsTriviallyDeinitable,
@@ -398,8 +404,12 @@ struct _Slots[V: Value](
         if new_len <= self._len:
             return
         self._grow_amortized(new_len)
-        for i in range(self._len, new_len):
-            self.meta(i) = _Meta(0, 0)
+        # A vacant slot is all-zero metadata; the value bytes are don't-care,
+        # so the whole range is one memset rather than a strided loop.
+        unsafe_memset_zero(
+            self._alloc.unsafe_ptr().unsafe_offset(self._len),
+            new_len - self._len,
+        )
         self._len = new_len
 
     @inline(.always)

@@ -55,13 +55,16 @@
     },
     {
       "id": 5,
-      "name": "Clean re-measure",
+      "name": "Assertions and memset",
       "commit": "pending",
       "run": null,
       "results": null,
-      "summary": "The round-4 code measured alone, with the interleaved runner. Establishes the trustworthy numbers to climb from.",
+      "summary": "Measured alone with the interleaved runner. Adds the raw-pointer swap-remove for DenseSlotMap (no bounds-checked pop in the hot path), a memset for SecondaryMap's vacant extension, and benchmark closures that no longer index with a bounds check.",
       "changes": [
-        "interleaved-runner"
+        "interleaved-runner",
+        "no-pop-in-hot-path",
+        "memset-vacant",
+        "bench-no-indexing"
       ]
     }
   ],
@@ -198,6 +201,27 @@
       "status": "no effect",
       "target": "SlotMap/SecondaryMap iteration (1.7x)",
       "detail": "Tried likely/unlikely hints on the occupancy branch, a count-down exit instead of an index compare, inlining the vacant skip as a continue, and a pointer cursor. All landed between 0.55 and 0.78 ns per element. A plain `while i < n: if occupied: s += value; i += 1` loop over the same slots runs at 0.32 ns (Rust: 0.33-0.41): the compiler turns any 'scan until found, then return' shape, which is what __next__ must be, into a loop that is re-entered per element at about 2 cycles instead of 1."
+    },
+    {
+      "id": "no-pop-in-hot-path",
+      "name": "Raw-pointer swap-remove instead of List.pop()",
+      "status": "kept",
+      "target": "DenseSlotMap remove (1.2-1.6x)",
+      "detail": "The remove loop's assembly showed eight stack stores per element that build a bounds-check abort message: List.pop() runs check_bounds, which is on by default, and the compiler hoists the message setup above the branch that never fires. The swap-remove now moves elements through raw pointers and adjusts the lists' length directly. Local: 5.0 -> 4.5 ns at 100K and 7.0 -> 4.8 at 1M (Rust 5.2 / 6.4)."
+    },
+    {
+      "id": "memset-vacant",
+      "name": "memset for SecondaryMap's vacant extension",
+      "status": "kept",
+      "target": "SecondaryMap insert at 1M (1.4x)",
+      "detail": "When a key's index is past the end, the map extends with vacant slots. That was a strided loop writing 8 bytes per 16-byte slot; a vacant slot is all-zero metadata and the value bytes are don't-care, so the whole range is now one memset."
+    },
+    {
+      "id": "bench-no-indexing",
+      "name": "No bounds-checked indexing in benchmark loops",
+      "status": "kept",
+      "target": "Benchmark harness (Mojo side)",
+      "detail": "The secondary-map closures indexed the key list with keys[i]; that bounds check's abort setup is hoisted into the loop just like List.pop's. They iterate the list directly now, matching Rust's enumerate()."
     }
   ],
   "issues": [
@@ -310,6 +334,11 @@
           "round": 4,
           "title": "Loop shape decides iteration speed, not instruction count",
           "detail": "Two loops with 8 and 10 instructions per element ran at 1 and 2 cycles per element. The fast one is a single counted loop with the occupancy test as a forward skip; the slow one is what the iterator protocol produces: find the next element, return it, re-enter. No hint or cursor change altered that. The remaining 1.7x on SlotMap and SecondaryMap iteration is this, and closing it would need the compiler to fuse the consumer's loop with __next__."
+        },
+        {
+          "round": 5,
+          "title": "Default-on assertions are not free even when they never fire",
+          "detail": "check_bounds (List.pop, List indexing) builds its abort message eagerly and the compiler hoists that setup above the branch. In a tight loop that was eight extra stores per element and about 30% of DenseSlotMap's removal cost. Hot paths should use the unsafe accessors, whose checks are off by default."
         }
       ]
     },

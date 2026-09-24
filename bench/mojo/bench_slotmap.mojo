@@ -188,9 +188,13 @@ def bench_secondary(mut b: Bench, n: Int) raises:
         m = S()
 
     def insert_all(mut m: S) {keys}:
+        # `for k in keys` rather than `keys[i]`: the indexing bounds check's
+        # abort setup gets hoisted into the loop.
         var s = 0
-        for i in range(len(keys)):
-            s += m.insert(keys[i], i).or_else(0)
+        var i = 0
+        for k in keys:
+            s += m.insert(k, i).or_else(0)
+            i += 1
         keep(s)
 
     def bench_insert(mut bencher: Bencher) raises {insert_all}:
@@ -249,9 +253,13 @@ def bench_sparse_secondary(mut b: Bench, n: Int) raises:
         m = S()
 
     def insert_all(mut m: S) {keys}:
+        # `for k in keys` rather than `keys[i]`: the indexing bounds check's
+        # abort setup gets hoisted into the loop.
         var s = 0
-        for i in range(len(keys)):
-            s += m.insert(keys[i], i).or_else(0)
+        var i = 0
+        for k in keys:
+            s += m.insert(k, i).or_else(0)
+            i += 1
         keep(s)
 
     def bench_insert(mut bencher: Bencher) raises {insert_all}:
