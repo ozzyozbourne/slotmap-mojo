@@ -118,6 +118,14 @@ details > summary { cursor: pointer; color: var(--accent-ink); font-size: 13.5px
 .issues { display: grid; gap: 10px; margin-top: 14px; }
 .issue { border-left: 3px solid var(--serious); padding: 4px 0 4px 14px; }
 .issue.f { border-left-color: var(--accent); }
+.lgroup { margin-top: 22px; }
+.lgroup h3 { font-size: 15px; color: var(--ink-2); font-weight: 600; letter-spacing: 0.01em; }
+.lgroup ol { margin: 8px 0 0; padding-left: 0; list-style: none; display: grid; gap: 8px; }
+.lgroup li { display: grid; grid-template-columns: 74px 1fr; gap: 12px; background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 10px 14px; }
+.lgroup li .rd { font-family: var(--mono); font-size: 11.5px; color: var(--muted); padding-top: 3px; }
+.lgroup li strong { display: block; font-weight: 600; }
+.lgroup li p { font-size: 14px; color: var(--ink-2); margin-top: 2px; max-width: 80ch; }
+@media (max-width: 520px) { .lgroup li { grid-template-columns: 1fr; } }
 .issue p { font-size: 14px; color: var(--ink-2); margin-top: 3px; max-width: 80ch; }
 @media (max-width: 520px) { .round { grid-template-columns: 1fr; } .round .no { padding-top: 0; } }
 @media (prefers-reduced-motion: reduce) { .chart .bar { transition: none; } }
@@ -163,7 +171,11 @@ details > summary { cursor: pointer; color: var(--accent-ink); font-size: 13.5px
   <h2>Issues along the way</h2>
   <div class="issues" id="issues"></div>
 
-  <h2>What was learned</h2>
+  <h2>Learnings</h2>
+  <p class="note">Grouped by kind, with the round in which each was learned. This section grows after every optimization attempt.</p>
+  <div id="learnings"></div>
+
+  <h2>Findings on the critical path</h2>
   <div class="issues" id="findings"></div>
 
   <h2>Method</h2>
@@ -309,13 +321,18 @@ function renderTech() {
     `<div class="t" id="t-${t.id}"><div class="h"><span class="st ${cls(t.status)}">${esc(t.status)}</span><h3>${esc(t.name)}</h3></div><div class="tg">${esc(t.target)}</div><p>${esc(t.detail)}</p></div>`).join("");
 }
 
+function renderLearnings() {
+  $("#learnings").innerHTML = (LOG.learnings || []).map(g => `<div class="lgroup"><h3>${esc(g.group)}</h3><ol>` +
+    g.items.map(i => `<li><span class="rd">round ${i.round}</span><div><strong>${esc(i.title)}</strong><p>${esc(i.detail)}</p></div></li>`).join("") + `</ol></div>`).join("");
+}
+
 function renderIssues() {
   $("#issues").innerHTML = LOG.issues.map(i => `<div class="issue"><h3>${esc(i.title)}</h3><p>${esc(i.detail)}</p></div>`).join("");
   $("#findings").innerHTML = LOG.findings.map(i => `<div class="issue f"><h3>${esc(i.title)}</h3><p>${esc(i.detail)}</p></div>`).join("");
 }
 
 $("#updated").textContent = "generated " + LOG.generated;
-renderTiles(); renderButtons(); renderChart(); renderTrend(); renderRounds(); renderTech(); renderIssues();
+renderTiles(); renderButtons(); renderChart(); renderTrend(); renderRounds(); renderTech(); renderLearnings(); renderIssues();
 </script>
 """
 
