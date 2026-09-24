@@ -1,0 +1,4 @@
+slotmap-mojo is a Mojo port of the Rust `slotmap` crate
+(https://github.com/orlp/slotmap), by Orson Peters, released under the Zlib
+license (see LICENSE). This is an altered version: the code was translated to
+Mojo and changed as described in README.md. It is not the original software.

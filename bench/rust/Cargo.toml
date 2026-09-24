@@ -1,0 +1,20 @@
+[package]
+name = "slotmap-bench"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+ahash = "0.8"
+slotmap = "=1.1.1"
+
+[dev-dependencies]
+criterion = "0.8"
+
+[[bench]]
+name = "slotmap"
+harness = false
+
+[profile.bench]
+codegen-units = 1
+lto = "thin"

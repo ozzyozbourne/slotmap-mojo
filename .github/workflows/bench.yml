@@ -1,0 +1,39 @@
+name: Benchmark
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "thorough (~25 min) or quick (~1 min smoke run)"
+        type: choice
+        options: [thorough, quick]
+        default: thorough
+  schedule:
+    - cron: "0 6 * * 1"  # Mondays 06:00 UTC, thorough.
+
+jobs:
+  bench:
+    runs-on: macos-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+      - uses: prefix-dev/setup-pixi@v0.10.2
+        with:
+          pixi-version: v0.55.0
+          cache: true
+          locked: true
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: bench/rust
+      - name: Benchmark Rust and Mojo
+        env:
+          SLOTMAP_BENCH_QUICK: ${{ inputs.mode == 'quick' && '1' || '0' }}
+        run: pixi run bench
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: bench-results
+          path: |
+            bench/results/
+            bench/rust/target/criterion/

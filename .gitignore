@@ -1,0 +1,5 @@
+.pixi/
+*.mojoc
+bench/rust/target/
+bench/mojo/bench_slotmap
+bench/results/

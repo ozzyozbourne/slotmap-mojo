@@ -1,0 +1,15 @@
+[workspace]
+authors = ["ozzyozbourne <khanosaid726@gmail.com>"]
+channels = ["https://conda.modular.com/max-nightly", "conda-forge"]
+name = "port"
+platforms = ["osx-arm64"]
+version = "0.1.0"
+
+[tasks]
+test = "./run_tests.sh -D ASSERT=all"
+test-release = "./run_tests.sh"
+bench = "bench/run_bench.sh"
+bench-quick = { cmd = "bench/run_bench.sh", env = { SLOTMAP_BENCH_QUICK = "1" } }
+
+[dependencies]
+mojo = ">=1.2.0.dev2026092305,<2"

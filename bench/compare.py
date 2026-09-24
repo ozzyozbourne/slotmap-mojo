@@ -1,0 +1,116 @@
+#!/usr/bin/env python3
+"""Joins the Criterion (Rust) and std.benchmark (Mojo) results into one table.
+
+Both tools report the mean time per iteration, and each iteration is one pass
+over n elements, so the table shows the mean time per element in nanoseconds.
+Writes results.md (also appended to $GITHUB_STEP_SUMMARY when set) and
+results.json to the output directory.
+"""
+
+import argparse
+import csv
+import json
+import os
+import platform
+import re
+import subprocess
+from pathlib import Path
+
+MAPS = ["SlotMap", "HopSlotMap", "DenseSlotMap", "SecondaryMap", "SparseSecondaryMap"]
+OPS = ["insert", "get", "remove", "iter_half", "iter", "reinsert"]
+
+
+def rust_results(criterion_dir: Path) -> dict:
+    out = {}
+    for est in criterion_dir.glob("*/*/*/new/estimates.json"):
+        map_name, op, n = est.parts[-5], est.parts[-4], est.parts[-3]
+        mean_ns = json.loads(est.read_text())["mean"]["point_estimate"]
+        out[(map_name, op, int(n))] = mean_ns / int(n)
+    return out
+
+
+def mojo_results(csv_path: Path) -> dict:
+    out = {}
+    with csv_path.open() as f:
+        for row in csv.DictReader(f):
+            m = re.fullmatch(r"(\w+)/(\w+)/input_id:(\d+)", row["name"])
+            if not m:
+                continue
+            n = int(m.group(3))
+            out[(m.group(1), m.group(2), n)] = float(row["met (ms)"]) * 1e6 / n
+    return out
+
+
+def command_output(cmd: list) -> str:
+    try:
+        return subprocess.run(cmd, capture_output=True, text=True).stdout.strip()
+    except OSError:
+        return "unknown"
+
+
+def fmt(ns):
+    return "—" if ns is None else (f"{ns:.2f}" if ns < 100 else f"{ns:.0f}")
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--rust", type=Path, required=True, help="Criterion output dir")
+    ap.add_argument("--mojo", type=Path, required=True, help="Mojo CSV file")
+    ap.add_argument("--out", type=Path, required=True)
+    ap.add_argument("--mode", default="thorough")
+    args = ap.parse_args()
+
+    rust, mojo = rust_results(args.rust), mojo_results(args.mojo)
+    keys = sorted(
+        set(rust) | set(mojo),
+        key=lambda k: (MAPS.index(k[0]) if k[0] in MAPS else 99,
+                       OPS.index(k[1]) if k[1] in OPS else 99, k[2]),
+    )
+
+    cpu = command_output(["sysctl", "-n", "machdep.cpu.brand_string"]) or platform.processor()
+    env = {
+        "machine": f"{cpu} ({platform.system()} {platform.machine()})",
+        "rustc": command_output(["rustc", "--version"]),
+        "mojo": command_output(["mojo", "--version"]),
+        "mode": args.mode,
+    }
+
+    lines = [
+        "## slotmap: Rust vs Mojo",
+        "",
+        f"Mean time per element, in ns (lower is better). Mode: **{env['mode']}**.  ",
+        f"Machine: {env['machine']}  ",
+        f"Rust: {env['rustc']} with `slotmap` 1.1.1 and Criterion  ",
+        f"Mojo: {env['mojo']} with `std.benchmark`",
+        "",
+        "Mojo/Rust below 1.00 means Mojo is faster. The two sparse maps use aHash in "
+        "both languages. Shared CI runners are noisy: treat differences under "
+        "~15% as noise.",
+    ]
+    rows = []
+    current = None
+    for k in keys:
+        map_name, op, n = k
+        if map_name != current:
+            current = map_name
+            lines += ["", f"### {map_name}", "",
+                      "| operation | n | Rust | Mojo | Mojo/Rust |",
+                      "| --- | ---: | ---: | ---: | ---: |"]
+        r, m = rust.get(k), mojo.get(k)
+        ratio = f"{m / r:.2f}" if r and m else "—"
+        lines.append(f"| {op} | {n:,} | {fmt(r)} | {fmt(m)} | {ratio} |")
+        rows.append({"map": map_name, "op": op, "n": n,
+                     "rust_ns_per_elem": r, "mojo_ns_per_elem": m})
+
+    args.out.mkdir(parents=True, exist_ok=True)
+    md = "\n".join(lines) + "\n"
+    (args.out / "results.md").write_text(md)
+    (args.out / "results.json").write_text(json.dumps({"env": env, "results": rows}, indent=2))
+    if os.environ.get("GITHUB_STEP_SUMMARY"):
+        with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as f:
+            f.write(md)
+    print(md)
+
+
+if __name__ == "__main__":
+    main()
