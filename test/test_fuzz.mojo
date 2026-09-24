@@ -25,7 +25,13 @@ def fuzz[M: SlotMapLike](seed: Int) raises where conforms_to(M.ValueType, Deinit
         return rebind_var[M.ValueType](Int(k.data().idx))
 
     for _ in range(rng.below(300)):
-        var op = rng.below(9)
+        # `clear` and `drain` empty the map, so they are rare: otherwise
+        # `get_disjoint_mut` never sees four valid keys at once.
+        var op = rng.below(7)
+        if rng.below(25) == 0:
+            op = 5 + rng.below(2)
+        elif op >= 5:
+            op += 2
         if op == 0:
             map.reserve(rng.below(256))
         elif op == 1 or op == 2:
@@ -78,10 +84,13 @@ def fuzz[M: SlotMapLike](seed: Int) raises where conforms_to(M.ValueType, Deinit
         else:
             if len(keys) == 0:
                 continue
-            var a = keys[rng.below(len(keys))]
-            var b = keys[rng.below(len(keys))]
+            # Prefer recent keys, which are more likely to still be valid, so
+            # the disjoint path is taken often; older keys mix in invalid ones.
+            var lo = max(0, len(keys) - 12)
+            var a = keys[lo + rng.below(len(keys) - lo)]
+            var b = keys[lo + rng.below(len(keys) - lo)]
             var c = keys[rng.below(len(keys))]
-            var d = keys[rng.below(len(keys))]
+            var d = keys[lo + rng.below(len(keys) - lo)]
             var r = map.get_disjoint_mut[4]([a, b, c, d])
             var all_valid = a in map and b in map and c in map and d in map
             var distinct = (

@@ -164,18 +164,23 @@ struct DenseSlotMap[V: Value, K: Key = DefaultKey](
         return dense_idx
 
     def _swap_remove(mut self, dense_idx: Int) -> Self.V:
-        """Removes the dense element at `dense_idx` by swapping the last one
-        into its place."""
-        var last = len(self._keys) - 1
-        if dense_idx != last:
-            self._keys.swap_elements(dense_idx, last)
-            self._values.swap_elements(dense_idx, last)
-        _ = self._keys.pop()
-        var value = self._values.pop()
-        # Did something take our place? Update its slot to the new position.
-        if dense_idx < len(self._keys):
-            var moved = Int(self._keys.unsafe_get(dense_idx).data().idx)
-            self._slots.unsafe_get(moved).next_free = UInt32(dense_idx)
+        """Removes the dense element at `dense_idx` by moving the last one
+        into its place (Rust's `Vec::swap_remove`)."""
+        var last_key = self._keys.pop()
+        var last_value = self._values.pop()
+        if dense_idx == len(self._keys):
+            return last_value^  # It was the last element.
+        var value = self._values.unsafe_ptr().unsafe_offset(
+            dense_idx
+        ).unsafe_take_pointee()
+        self._values.unsafe_ptr().unsafe_offset(dense_idx).unsafe_write(
+            last_value^
+        )
+        self._keys.unsafe_get(dense_idx) = last_key
+        # The moved element's slot must point at its new position.
+        self._slots.unsafe_get(Int(last_key.data().idx)).next_free = UInt32(
+            dense_idx
+        )
         return value^
 
     def _remove_from_slot(mut self, slot_idx: Int) -> Self.V:

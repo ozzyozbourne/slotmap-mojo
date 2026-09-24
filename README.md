@@ -138,20 +138,32 @@ expected error. They cover:
 
 - **Slot storage.** Rust stores `union { value, next_free }` per slot. Mojo has
   no unions, so `SlotMap`, `SecondaryMap` and `HopSlotMap` share `_Slots`
-  (`slotmap/_common.mojo`). It is a `List` of `(version, next_free)` records
-  plus a value buffer, where a value exists only while its slot's version is
-  odd. The same version-parity trick also drives destruction, copying and growth.
-  The buffer is held as a linear `Allocation[V]`, so the compiler checks that
-  every path frees it.
-- **`SparseSecondaryMap`** is a `Dict[UInt32 → position]` plus dense key and
-  value lists with swap-remove. Upstream uses `HashMap<u32, (version, V)>`, but
-  `Dict.items()` needs copyable values, so wrapping `Dict` directly would not
-  support move-only values.
+  (`slotmap/_common.mojo`): one array of `(version, next_free, value)` slots,
+  where the value is initialized only while the slot's version is odd. That
+  puts a slot's metadata and value on the same cache line, as in Rust. The
+  same version-parity trick drives destruction, copying and growth; trivially
+  movable values are moved with `memcpy`. The buffer is held as a linear
+  `Allocation`, so the compiler checks that every path frees it.
+- **`SparseSecondaryMap`** is a Swiss table (control bytes probed 16 at a
+  time, 7/8 load factor, tombstones) over `(slot index, version, value)`
+  entries, the same design as Rust's `HashMap<u32, (u32, V)>` with hashbrown.
+  The default hasher, `IdxHasher`, is a multiplicative hash that stays in
+  integer registers; the stdlib `AHasher` moves its 128-bit multiply through
+  vector registers, and that latency sits on the critical path of every
+  probe. Pass `H=` to use another `Hasher`.
 - **`HopSlotMap`** keeps its free-list block metadata (`next`, `prev`,
   `other_end`) in a parallel list rather than inside the vacant slot.
 - **Compile-time specialization.** Maps whose values need no destructor
   (`IsTriviallyDeinitable`, the Mojo counterpart of Rust's `needs_drop`)
-  skip the per-slot destructor loop. That is a `comptime if` in `_Slots`.
+  skip the per-slot destructor loop, and trivially copyable/movable values
+  are copied and grown with `memcpy`. Both are `comptime if`s in `_Slots`.
+- **Iteration.** Mojo's `for` calls `__next__` per element, and the compiler
+  does not merge the iterator's skip loop with the consumer's loop. The
+  iterators therefore take a straight-line fast path when the next slot is
+  occupied and only enter a loop to skip vacant ones. Mojo also does not
+  auto-vectorize reductions (even a plain pointer loop summing `Int`s
+  compiles to scalar code, at any `-O` level), so summing over a
+  `DenseSlotMap` stays several times slower than Rust's vectorized loop.
 - **Testing.** Every Rust unit test was ported: drop counting, `disjoint`, the
   quickcheck HashMap-equivalence tests (200 seeds each), and the fuzz target
   (300 seeds per map, checked against a model after every operation).

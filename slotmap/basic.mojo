@@ -122,7 +122,7 @@ struct SlotMap[V: Value, K: Key = DefaultKey](
         var kd = key.data()
         return (
             Int(kd.idx) < len(self._slots)
-            and self._slots.meta.unsafe_get(Int(kd.idx)).version == kd.version
+            and self._slots.meta(Int(kd.idx)).version == kd.version
         )
 
     def contains_key(self, key: Self.K) -> Bool:
@@ -132,7 +132,7 @@ struct SlotMap[V: Value, K: Key = DefaultKey](
         """Returns the key the next inserted value will get."""
         var head = Int(self._free_head)
         if head < len(self._slots):
-            var version = self._slots.meta.unsafe_get(head).version | 1
+            var version = self._slots.meta(head).version | 1
             return Self.K(data=KeyData.new(UInt32(head), version))
         if len(self._slots) >= _MAX_SLOTS:
             abort("SlotMap is full")
@@ -143,12 +143,12 @@ struct SlotMap[V: Value, K: Key = DefaultKey](
         var kd = key.data()
         var idx = Int(kd.idx)
         if idx < len(self._slots):
-            self._free_head = self._slots.meta.unsafe_get(idx).next_free
+            self._free_head = self._slots.meta(idx).next_free
         else:
             self._slots.push_vacant(_Meta(0, 0))
             self._free_head = kd.idx + 1
         self._slots.write(idx, value^)
-        self._slots.meta.unsafe_get(idx).version = kd.version
+        self._slots.meta(idx).version = kd.version
         self._num_elems += 1
 
     def insert(mut self, var value: Self.V) -> Self.K:
@@ -156,9 +156,20 @@ struct SlotMap[V: Value, K: Key = DefaultKey](
 
         Aborts if the number of elements would exceed 2^32 - 2.
         """
-        var key = self._next_key()
-        self._commit(key, value^)
-        return key
+        # `_next_key` + `_commit` in one pass, touching the slot once.
+        var head = Int(self._free_head)
+        self._num_elems += 1
+        if head < len(self._slots):
+            var version = self._slots.meta(head).version | 1
+            self._free_head = self._slots.meta(head).next_free
+            self._slots.write(head, value^)
+            self._slots.meta(head).version = version
+            return Self.K(data=KeyData.new(UInt32(head), version))
+        if head >= _MAX_SLOTS:
+            abort("SlotMap is full")
+        self._slots.push_occupied(_Meta(1, 0), value^)
+        self._free_head = UInt32(head + 1)
+        return Self.K(data=KeyData.new(UInt32(head), 1))
 
     def insert_with_key(mut self, f: Some[def(Self.K) -> Self.V]) -> Self.K:
         """Inserts the value `f(key)`, where `key` is the key the value will
@@ -179,7 +190,7 @@ struct SlotMap[V: Value, K: Key = DefaultKey](
     def _remove_from_slot(mut self, idx: Int) -> Self.V:
         """Removes and returns the value of a slot that must be occupied."""
         var value = self._slots.take(idx)
-        ref slot = self._slots.meta.unsafe_get(idx)
+        ref slot = self._slots.meta(idx)
         slot.next_free = self._free_head
         slot.version += 1
         self._free_head = UInt32(idx)
@@ -204,7 +215,7 @@ struct SlotMap[V: Value, K: Key = DefaultKey](
             raise Error("detach: key is not present")
         var idx = Int(key.data().idx)
         var value = self._slots.take(idx)
-        ref slot = self._slots.meta.unsafe_get(idx)
+        ref slot = self._slots.meta(idx)
         slot.next_free = UInt32.MAX
         slot.version += 1
         self._num_elems -= 1
@@ -217,8 +228,8 @@ struct SlotMap[V: Value, K: Key = DefaultKey](
         var idx = Int(kd.idx)
         if (
             idx >= len(self._slots)
-            or self._slots.meta.unsafe_get(idx).version != kd.version + 1
-            or self._slots.meta.unsafe_get(idx).next_free != UInt32.MAX
+            or self._slots.meta(idx).version != kd.version + 1
+            or self._slots.meta(idx).next_free != UInt32.MAX
         ):
             abort("key is not detached")
         return idx
@@ -229,14 +240,14 @@ struct SlotMap[V: Value, K: Key = DefaultKey](
         var key = detached.key()
         var idx = self._check_detached(key)
         self._slots.write(idx, detached^._into_value())
-        self._slots.meta.unsafe_get(idx).version = key.data().version
+        self._slots.meta(idx).version = key.data().version
         self._num_elems += 1
 
     def release(mut self, var detached: Detached[Self.V, Self.K]) -> Self.V:
         """Returns a detached value and frees its slot for reuse. The key
         stays invalid. Aborts if the slot is not detached in this map."""
         var idx = self._check_detached(detached.key())
-        ref slot = self._slots.meta.unsafe_get(idx)
+        ref slot = self._slots.meta(idx)
         slot.next_free = self._free_head
         self._free_head = UInt32(idx)
         return detached^._into_value()
@@ -247,7 +258,7 @@ struct SlotMap[V: Value, K: Key = DefaultKey](
         """Keeps only the elements for which `f(key, value)` returns `True`.
         """
         for i in range(1, len(self._slots)):
-            var version = self._slots.meta.unsafe_get(i).version
+            var version = self._slots.meta(i).version
             if version & 1 == 0:
                 continue
             var key = Self.K(data=KeyData.new(UInt32(i), version))
@@ -257,7 +268,7 @@ struct SlotMap[V: Value, K: Key = DefaultKey](
     def clear(mut self) where conforms_to(Self.V, Deinitable):
         """Removes all elements. Keeps the allocated memory for reuse."""
         for i in range(1, len(self._slots)):
-            if self._slots.meta.unsafe_get(i).occupied():
+            if self._slots.meta(i).occupied():
                 _ = self._remove_from_slot(i)
 
     def drain[
@@ -335,18 +346,23 @@ struct SlotMap[V: Value, K: Key = DefaultKey](
                 break
             # Temporarily mark the slot vacant so a duplicate key shows up as
             # invalid. This gives a linear time disjointness check.
-            self._slots.meta.unsafe_get(Int(kd.idx)).version ^= 1
+            self._slots.meta(Int(kd.idx)).version ^= 1
             i += 1
 
         for j in range(i):
-            self._slots.meta.unsafe_get(Int(keys[j].data().idx)).version ^= 1
+            self._slots.meta(Int(keys[j].data().idx)).version ^= 1
 
         if i != N:
             return None
-        var base = self._ptr(0).unsafe_origin_cast[origin]()
-        var result = Array[Pointer[Self.V, origin], N](fill=base)
+        # Slots interleave metadata and value, so each pointer is computed
+        # per slot rather than by offsetting a base pointer.
+        var result = Array[Pointer[Self.V, origin], N](
+            fill=self._ptr(0).unsafe_origin_cast[origin]()
+        )
         for j in range(N):
-            result[j] = base.unsafe_offset(Int(keys[j].data().idx))
+            result[j] = self._ptr(Int(keys[j].data().idx)).unsafe_origin_cast[
+                origin
+            ]()
         return result^
 
     # ===------------------------------------------------------------------===#
@@ -364,8 +380,7 @@ struct SlotMap[V: Value, K: Key = DefaultKey](
 
     def items(ref self) -> _SlotIter[Self.K, Self.V, origin_of(self)]:
         return {
-            self._slots.meta_ptr(),
-            self._ptr(0),
+            self._slots.slots_ptr().unsafe_origin_cast[origin_of(self)](),
             len(self._slots),
             1,
             len(self),
@@ -414,7 +429,7 @@ struct _Drain[
         while self._cur < len(sm._slots):
             var idx = self._cur
             self._cur += 1
-            var version = sm._slots.meta.unsafe_get(idx).version
+            var version = sm._slots.meta(idx).version
             if version & 1 == 1:
                 var key = Self.K(data=KeyData.new(UInt32(idx), version))
                 return (key, sm._remove_from_slot(idx))
@@ -438,7 +453,7 @@ struct _IntoIter[V: _DropValue, K: Key](Iterator, Movable):
         while self._cur < len(self._sm._slots):
             var idx = self._cur
             self._cur += 1
-            var version = self._sm._slots.meta.unsafe_get(idx).version
+            var version = self._sm._slots.meta(idx).version
             if version & 1 == 1:
                 var key = Self.K(data=KeyData.new(UInt32(idx), version))
                 return (key, self._sm._remove_from_slot(idx))

@@ -9,7 +9,15 @@ from std.builtin.rebind import downcast
 from std.os import abort
 
 from .key import DefaultKey, Key, KeyData
-from ._common import Item, SlotMapLike, Value, _DropValue, _Meta, _Slots
+from ._common import (
+    Item,
+    SlotMapLike,
+    Value,
+    _DropValue,
+    _Meta,
+    _RawSlot,
+    _Slots,
+)
 
 
 @fieldwise_init
@@ -132,7 +140,7 @@ struct HopSlotMap[V: Value, K: Key = DefaultKey](
 
     @inline(.always)
     def _occupied(self, idx: Int) -> Bool:
-        return self._slots.meta.unsafe_get(idx).occupied()
+        return self._slots.meta(idx).occupied()
 
     def _next_key(self) -> Self.K:
         if self._num_elems + 1 == UInt32.MAX:
@@ -166,7 +174,7 @@ struct HopSlotMap[V: Value, K: Key = DefaultKey](
                 self._fl(new_back).other_end = front
                 self._fl(front).other_end = new_back
         self._slots.write(idx, value^)
-        self._slots.meta.unsafe_get(idx).version = kd.version
+        self._slots.meta(idx).version = kd.version
         self._num_elems += 1
 
     def insert(mut self, var value: Self.V) -> Self.K:
@@ -194,7 +202,7 @@ struct HopSlotMap[V: Value, K: Key = DefaultKey](
     def _remove_from_slot(mut self, idx: Int) -> Self.V:
         """Removes and returns the value of a slot that must be occupied,
         merging the slot into the neighboring vacant blocks."""
-        self._slots.meta.unsafe_get(idx).version += 1
+        self._slots.meta(idx).version += 1
         var value = self._slots.take(idx)
 
         # Can't underflow thanks to the sentinel at index 0.
@@ -355,16 +363,21 @@ struct HopSlotMap[V: Value, K: Key = DefaultKey](
         while i < N:
             if keys[i] not in self:
                 break
-            self._slots.meta.unsafe_get(Int(keys[i].data().idx)).version ^= 1
+            self._slots.meta(Int(keys[i].data().idx)).version ^= 1
             i += 1
         for j in range(i):
-            self._slots.meta.unsafe_get(Int(keys[j].data().idx)).version ^= 1
+            self._slots.meta(Int(keys[j].data().idx)).version ^= 1
         if i != N:
             return None
-        var base = self._ptr(0).unsafe_origin_cast[origin]()
-        var result = Array[Pointer[Self.V, origin], N](fill=base)
+        # Slots interleave metadata and value, so each pointer is computed
+        # per slot rather than by offsetting a base pointer.
+        var result = Array[Pointer[Self.V, origin], N](
+            fill=self._ptr(0).unsafe_origin_cast[origin]()
+        )
         for j in range(N):
-            result[j] = base.unsafe_offset(Int(keys[j].data().idx))
+            result[j] = self._ptr(Int(keys[j].data().idx)).unsafe_origin_cast[
+                origin
+            ]()
         return result^
 
     # ===------------------------------------------------------------------===#
@@ -383,11 +396,10 @@ struct HopSlotMap[V: Value, K: Key = DefaultKey](
         """Iterates over `Item`s in arbitrary order, hopping over blocks of
         vacant slots. Values are mutable if `self` is."""
         return {
-            self._slots.meta_ptr(),
+            self._slots.slots_ptr().unsafe_origin_cast[origin_of(self)](),
             self._free.unsafe_ptr()
             .unsafe_mut_cast[False]()
             .unsafe_origin_cast[ImmUntrackedOrigin](),
-            self._ptr(0),
             self._first(),
             len(self),
         }
@@ -423,16 +435,15 @@ struct HopSlotMap[V: Value, K: Key = DefaultKey](
 
 @fieldwise_init
 struct _HopIter[
-    mut: Bool, //, K: Key, V: AnyType, origin: Origin[mut=mut]
+    mut: Bool, //, K: Key, V: Movable, origin: Origin[mut=mut]
 ](ImplicitlyCopyable, Iterable, Iterator):
     comptime Element = Item[Self.K, Self.V, Self.origin]
     comptime IteratorType[
         iterable_mut: Bool, //, iterable_origin: Origin[mut=iterable_mut]
     ]: Iterator = Self
 
-    var _meta: Pointer[_Meta, ImmUntrackedOrigin]
+    var _slots: Pointer[_RawSlot[Self.V], Self.origin]
     var _free: Pointer[_FreeListEntry, ImmUntrackedOrigin]
-    var _values: Pointer[Self.V, Self.origin]
     var _cur: Int
     var _num_left: Int
 
@@ -445,13 +456,13 @@ struct _HopIter[
             raise StopIteration()
         self._num_left -= 1
         var idx = self._cur
-        if not self._meta[unsafe_offset=idx].occupied():
+        if not self._slots[unsafe_offset=idx].meta.occupied():
             idx = Int(self._free[unsafe_offset=idx].other_end) + 1
         self._cur = idx + 1
-        var version = self._meta[unsafe_offset=idx].version
+        ref slot = self._slots[unsafe_offset=idx]
         return Item(
-            Self.K(data=KeyData.new(UInt32(idx), version)),
-            self._values.unsafe_offset(idx),
+            Self.K(data=KeyData.new(UInt32(idx), slot.meta.version)),
+            Pointer(to=slot.value).unsafe_origin_cast[Self.origin](),
         )
 
     def bounds(self) -> Tuple[Int, Optional[Int]]:
@@ -460,7 +471,7 @@ struct _HopIter[
 
 @fieldwise_init
 struct _HopKeysIter[
-    mut: Bool, //, K: Key, V: AnyType, origin: Origin[mut=mut]
+    mut: Bool, //, K: Key, V: Movable, origin: Origin[mut=mut]
 ](ImplicitlyCopyable, Iterable, Iterator):
     comptime Element = Self.K
     comptime IteratorType[

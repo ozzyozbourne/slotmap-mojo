@@ -118,10 +118,7 @@ struct SecondaryMap[V: Value, K: Key = DefaultKey](
 
     def _ensure_slot(mut self, idx: Int):
         """Extends the slots with vacant ones so `idx` is valid."""
-        if idx >= len(self._slots):
-            self._slots.reserve(idx + 1)
-            while len(self._slots) <= idx:
-                self._slots.push_vacant(_Meta(0, 0))
+        self._slots.extend_vacant(idx + 1)
 
     def insert(
         mut self, key: Self.K, var value: Self.V
@@ -153,7 +150,7 @@ struct SecondaryMap[V: Value, K: Key = DefaultKey](
             self._num_elems += 1
 
         self._slots.write(idx, value^)
-        self._slots.meta.unsafe_get(idx).version = kd.version
+        self._slots.meta(idx).version = kd.version
         return None
 
     def insert_returning(
@@ -179,16 +176,16 @@ struct SecondaryMap[V: Value, K: Key = DefaultKey](
                 return value^  # A newer key holds the slot.
             var old = self._slots.take(idx)
             self._slots.write(idx, value^)
-            self._slots.meta.unsafe_get(idx).version = kd.version
+            self._slots.meta(idx).version = kd.version
             return old^
         self._num_elems += 1
         self._slots.write(idx, value^)
-        self._slots.meta.unsafe_get(idx).version = kd.version
+        self._slots.meta(idx).version = kd.version
         return None
 
     def _remove_from_slot(mut self, idx: Int) -> Self.V:
         self._num_elems -= 1
-        self._slots.meta.unsafe_get(idx).version = 0
+        self._slots.meta(idx).version = 0
         return self._slots.take(idx)
 
     def remove(mut self, key: Self.K) -> Optional[Self.V]:
@@ -213,7 +210,7 @@ struct SecondaryMap[V: Value, K: Key = DefaultKey](
     def clear(mut self) where conforms_to(Self.V, Deinitable):
         """Removes all elements. Keeps the allocated memory for reuse."""
         for i in range(len(self._slots)):
-            if self._slots.meta.unsafe_get(i).occupied():
+            if self._slots.meta(i).occupied():
                 _ = self._remove_from_slot(i)
 
     def drain[
@@ -292,20 +289,25 @@ struct SecondaryMap[V: Value, K: Key = DefaultKey](
                 break
             # Keys always have odd versions, so temporarily setting the
             # version to 2 makes a duplicate key show up as invalid.
-            ref meta = self._slots.meta.unsafe_get(Int(keys[i].data().idx))
+            ref meta = self._slots.meta(Int(keys[i].data().idx))
             versions[i] = meta.version
             meta.version = 2
             i += 1
         for j in range(i):
-            self._slots.meta.unsafe_get(
+            self._slots.meta(
                 Int(keys[j].data().idx)
             ).version = versions[j]
         if i != N:
             return None
-        var base = self._ptr(0).unsafe_origin_cast[origin]()
-        var result = Array[Pointer[Self.V, origin], N](fill=base)
+        # Slots interleave metadata and value, so each pointer is computed
+        # per slot rather than by offsetting a base pointer.
+        var result = Array[Pointer[Self.V, origin], N](
+            fill=self._ptr(0).unsafe_origin_cast[origin]()
+        )
         for j in range(N):
-            result[j] = base.unsafe_offset(Int(keys[j].data().idx))
+            result[j] = self._ptr(Int(keys[j].data().idx)).unsafe_origin_cast[
+                origin
+            ]()
         return result^
 
     def entry(
@@ -343,8 +345,7 @@ struct SecondaryMap[V: Value, K: Key = DefaultKey](
         """Iterates over `Item`s in arbitrary order. Values are mutable if
         `self` is."""
         return {
-            self._slots.meta_ptr(),
-            self._ptr(0),
+            self._slots.slots_ptr().unsafe_origin_cast[origin_of(self)](),
             len(self._slots),
             1,
             len(self),
@@ -434,12 +435,12 @@ struct Entry[V: Value, K: Key, origin: MutOrigin](ImplicitlyCopyable):
             map._slots.write(idx, value^)
             return old^
         # The slot may still hold an outdated element.
-        if map._slots.meta.unsafe_get(idx).occupied():
+        if map._slots.meta(idx).occupied():
             _ = map._slots.take(idx)
         else:
             map._num_elems += 1
         map._slots.write(idx, value^)
-        map._slots.meta.unsafe_get(idx).version = self._kd.version
+        map._slots.meta(idx).version = self._kd.version
         self._occupied = True
         return None
 

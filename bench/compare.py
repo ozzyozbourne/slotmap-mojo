@@ -58,9 +58,16 @@ def main():
     ap.add_argument("--mojo", type=Path, required=True, help="Mojo CSV file")
     ap.add_argument("--out", type=Path, required=True)
     ap.add_argument("--mode", default="thorough")
+    ap.add_argument("--baseline", type=Path, help="results.json of an earlier run, "
+                    "to show how the Mojo/Rust ratio changed")
     args = ap.parse_args()
 
     rust, mojo = rust_results(args.rust), mojo_results(args.mojo)
+    base = {}
+    if args.baseline:
+        for r in json.loads(args.baseline.read_text())["results"]:
+            if r["rust_ns_per_elem"] and r["mojo_ns_per_elem"]:
+                base[(r["map"], r["op"], r["n"])] = r["mojo_ns_per_elem"] / r["rust_ns_per_elem"]
     keys = sorted(
         set(rust) | set(mojo),
         key=lambda k: (MAPS.index(k[0]) if k[0] in MAPS else 99,
@@ -94,11 +101,12 @@ def main():
         if map_name != current:
             current = map_name
             lines += ["", f"### {map_name}", "",
-                      "| operation | n | Rust | Mojo | Mojo/Rust |",
-                      "| --- | ---: | ---: | ---: | ---: |"]
+                      "| operation | n | Rust | Mojo | Mojo/Rust |" + (" was |" if base else ""),
+                      "| --- | ---: | ---: | ---: | ---: |" + (" ---: |" if base else "")]
         r, m = rust.get(k), mojo.get(k)
         ratio = f"{m / r:.2f}" if r and m else "—"
-        lines.append(f"| {op} | {n:,} | {fmt(r)} | {fmt(m)} | {ratio} |")
+        was = f" {base[k]:.2f} |" if base and k in base else (" — |" if base else "")
+        lines.append(f"| {op} | {n:,} | {fmt(r)} | {fmt(m)} | {ratio} |{was}")
         rows.append({"map": map_name, "op": op, "n": n,
                      "rust_ns_per_elem": r, "mojo_ns_per_elem": m})
 

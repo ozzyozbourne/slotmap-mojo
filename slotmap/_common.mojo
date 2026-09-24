@@ -1,7 +1,11 @@
 """Pieces shared by the slot map implementations."""
 
-from std.memory import Allocation, Layout, dealloc
-from std.traits import IsTriviallyDeinitable
+from std.memory import Allocation, Layout, dealloc, unsafe_memcpy
+from std.traits import (
+    IsTriviallyCopyable,
+    IsTriviallyDeinitable,
+    IsTriviallyMovable,
+)
 
 from .key import Key, KeyData
 
@@ -154,16 +158,14 @@ struct Item[mut: Bool, //, K: Key, V: AnyType, origin: Origin[mut=mut]](
 
 @fieldwise_init
 struct _SlotIter[
-    mut: Bool, //, K: Key, V: AnyType, origin: Origin[mut=mut]
+    mut: Bool, //, K: Key, V: Movable, origin: Origin[mut=mut]
 ](ImplicitlyCopyable, Iterable, Iterator):
     comptime Element = Item[Self.K, Self.V, Self.origin]
     comptime IteratorType[
         iterable_mut: Bool, //, iterable_origin: Origin[mut=iterable_mut]
     ]: Iterator = Self
 
-    var _meta: Pointer[_Meta, ImmUntrackedOrigin]
-    """Untracked: `_values` already carries the borrow of the map."""
-    var _values: Pointer[Self.V, Self.origin]
+    var _slots: Pointer[_RawSlot[Self.V], Self.origin]
     var _num_slots: Int
     var _cur: Int
     var _num_left: Int
@@ -172,25 +174,49 @@ struct _SlotIter[
         return self.copy()
 
     def __next__(mut self) raises StopIteration -> Self.Element:
-        while self._cur < self._num_slots:
-            var idx = self._cur
-            self._cur += 1
-            var version = self._meta[unsafe_offset=idx].version
-            if version & 1 == 1:
-                self._num_left -= 1
-                return Item(
-                    Self.K(data=KeyData.new(UInt32(idx), version)),
-                    self._values.unsafe_offset(idx),
-                )
-        raise StopIteration()
+        # Fast path first: the common case (the next slot is occupied) is
+        # straight-line code, so the consumer's loop body stays one tight
+        # loop. Only a vacant slot enters the skip loop.
+        var slots = self._slots
+        var i = self._cur
+        var n = self._num_slots
+        if i >= n:
+            raise StopIteration()
+        var version = slots[unsafe_offset=i].meta.version
+        if version & 1 == 0:
+            i = _skip_vacant(slots, i + 1, n)
+            if i >= n:
+                self._cur = i
+                raise StopIteration()
+            version = slots[unsafe_offset=i].meta.version
+        self._cur = i + 1
+        self._num_left -= 1
+        return Item(
+            Self.K(data=KeyData.new(UInt32(i), version)),
+            Pointer(to=slots[unsafe_offset=i].value).unsafe_origin_cast[
+                Self.origin
+            ](),
+        )
 
     def bounds(self) -> Tuple[Int, Optional[Int]]:
         return (self._num_left, {self._num_left})
 
 
+@inline(.never)
+def _skip_vacant[
+    V: Movable, origin: Origin
+](slots: Pointer[_RawSlot[V], origin], start: Int, n: Int) -> Int:
+    """Returns the index of the first occupied slot at or after `start`, or
+    `n` if there is none."""
+    var i = start
+    while i < n and slots[unsafe_offset=i].meta.version & 1 == 0:
+        i += 1
+    return i
+
+
 @fieldwise_init
 struct _SlotKeysIter[
-    mut: Bool, //, K: Key, V: AnyType, origin: Origin[mut=mut]
+    mut: Bool, //, K: Key, V: Movable, origin: Origin[mut=mut]
 ](ImplicitlyCopyable, Iterable, Iterator):
     comptime Element = Self.K
     comptime IteratorType[
@@ -231,8 +257,21 @@ struct _SlotValuesIter[
 
 
 # ===-----------------------------------------------------------------------===#
-# Split slot storage.
+# Slot storage: metadata and value interleaved, like Rust's `Slot<T>`.
 # ===-----------------------------------------------------------------------===#
+
+
+struct _RawSlot[V: Movable](not Deinitable):
+    """One slot: its metadata followed by its value storage. `value` is
+    initialized iff `meta` is occupied (odd version), so a `_RawSlot` is only
+    ever handled through pointers, never as a whole value.
+
+    Keeping both in one struct means a lookup touches one cache line, as in
+    Rust, where the slot is `(version, union { value, next_free })`.
+    """
+
+    var meta: _Meta
+    var value: Self.V
 
 
 @explicit_destroy(
@@ -244,80 +283,124 @@ struct _Slots[V: Value](
     Movable,
     Sized,
 ):
-    """A metadata array plus a value array of the same capacity. The value
-    of slot `i` is initialized iff `meta[i]` is occupied (odd version).
+    """A growable array of `_RawSlot`s. Owners keep the occupancy bit in
+    sync with the values they write and take.
 
-    This replaces Rust's `union { value: ManuallyDrop<T>, next_free: u32 }`.
-    Owners must keep the occupancy bit in sync with the values they write
-    and take.
-
-    The value array is a linear `Allocation`, so the compiler checks that it
-    is deallocated on every path.
+    The storage is a linear `Allocation`, so the compiler checks that it is
+    deallocated on every path. Trivially movable/copyable values are moved
+    and copied with `memcpy`.
     """
 
-    var meta: List[_Meta]
-    var _alloc: Allocation[Self.V]
+    comptime Slot = _RawSlot[Self.V]
+
+    var _alloc: Allocation[Self.Slot]
+    var _len: Int
 
     def __init__(out self, *, capacity: Int):
-        self.meta = List[_Meta](capacity=capacity)
-        self._alloc = alloc(Layout[Self.V](count=capacity))
+        self._alloc = alloc(Layout[Self.Slot](count=capacity))
+        self._len = 0
 
     def __init__(out self, *, copy: Self) where conforms_to(Self.V, Copyable):
-        self.meta = copy.meta.copy()
-        self._alloc = alloc(Layout[Self.V](count=copy.capacity()))
-        for i in range(len(self.meta)):
-            if self.meta.unsafe_get(i).occupied():
-                self.raw(i).unsafe_write(copy=copy.raw(i)[])
+        self._alloc = alloc(Layout[Self.Slot](count=copy.capacity()))
+        self._len = copy._len
+        comptime if IsTriviallyCopyable[Self.V]:
+            unsafe_memcpy(
+                dest=self._alloc.unsafe_ptr(),
+                src=copy._alloc.unsafe_ptr(),
+                count=self._len,
+            )
+        else:
+            for i in range(self._len):
+                ref src = copy._alloc.unsafe_ptr()[unsafe_offset=i]
+                ref dst = self._alloc.unsafe_ptr()[unsafe_offset=i]
+                dst.meta = src.meta
+                if src.meta.occupied():
+                    Pointer(to=dst.value).unsafe_write(copy=src.value)
 
     def __deinit__(deinit self) where conforms_to(Self.V, Deinitable):
         # Like Rust's `needs_drop`: values with no destructor (e.g. `Int`)
         # skip the walk over every slot.
         comptime if not IsTriviallyDeinitable[Self.V]:
-            for i in range(len(self.meta)):
-                if self.meta.unsafe_get(i).occupied():
+            for i in range(self._len):
+                if self.meta(i).occupied():
                     self.raw(i).unsafe_deinit_pointee()
         dealloc(self._alloc^)
 
     def deinit_with(deinit self, deinit_func: Some[def(var Self.V)]):
         """Destroys the slots, passing each stored value to `deinit_func`."""
-        for i in range(len(self.meta)):
-            if self.meta.unsafe_get(i).occupied():
+        for i in range(self._len):
+            if self.meta(i).occupied():
                 deinit_func(self.raw(i).unsafe_take_pointee())
         dealloc(self._alloc^)
 
     @inline(.always)
     def __len__(self) -> Int:
-        return len(self.meta)
+        return self._len
 
     @inline(.always)
     def capacity(self) -> Int:
         return len(self._alloc.unsafe_span())
 
     @inline(.always)
+    def meta(ref self, idx: Int) -> ref[origin_of(self)] _Meta:
+        return Pointer(
+            to=self.slots_ptr()[unsafe_offset=idx].meta
+        ).unsafe_origin_cast[origin_of(self)]()[]
+
+    @inline(.always)
     def version(self, idx: Int) -> UInt32:
-        return self.meta.unsafe_get(idx).version
+        return self.meta(idx).version
 
     def reserve(mut self, new_capacity: Int):
         """Grows to hold at least `new_capacity` slots (exactly, if growing).
         """
         if new_capacity <= self.capacity():
             return
-        self.meta.reserve(new_capacity)
-        var new_alloc = alloc(Layout[Self.V](count=new_capacity))
-        var dest = new_alloc.unsafe_ptr()
-        for i in range(len(self.meta)):
-            if self.meta.unsafe_get(i).occupied():
-                dest.unsafe_offset(i).unsafe_write(
-                    self.raw(i).unsafe_take_pointee()
-                )
+        var new_alloc = alloc(Layout[Self.Slot](count=new_capacity))
+        comptime if IsTriviallyMovable[Self.V]:
+            unsafe_memcpy(
+                dest=new_alloc.unsafe_ptr(),
+                src=self._alloc.unsafe_ptr(),
+                count=self._len,
+            )
+        else:
+            for i in range(self._len):
+                ref src = self._alloc.unsafe_ptr()[unsafe_offset=i]
+                ref dst = new_alloc.unsafe_ptr()[unsafe_offset=i]
+                dst.meta = src.meta
+                if src.meta.occupied():
+                    Pointer(to=dst.value).unsafe_write(
+                        Pointer(to=src.value).unsafe_take_pointee()
+                    )
         swap(self._alloc, new_alloc)
         dealloc(new_alloc^)  # The old storage, now empty.
 
+    @inline(.always)
+    def _grow_amortized(mut self, min_capacity: Int):
+        if min_capacity > self.capacity():
+            self.reserve(max(2 * self.capacity(), min_capacity))
+
     def push_vacant(mut self, meta: _Meta):
         """Appends a slot, which must be vacant (even version)."""
-        if len(self.meta) == self.capacity():
-            self.reserve(max(2 * self.capacity(), len(self.meta) + 1))
-        self.meta.append(meta)
+        self._grow_amortized(self._len + 1)
+        self.meta(self._len) = meta
+        self._len += 1
+
+    def push_occupied(mut self, meta: _Meta, var value: Self.V):
+        """Appends an occupied slot (odd version) holding `value`."""
+        self._grow_amortized(self._len + 1)
+        self.raw(self._len).unsafe_write(value^)
+        self.meta(self._len) = meta
+        self._len += 1
+
+    def extend_vacant(mut self, new_len: Int):
+        """Appends vacant slots (version 0) until there are `new_len`."""
+        if new_len <= self._len:
+            return
+        self._grow_amortized(new_len)
+        for i in range(self._len, new_len):
+            self.meta(i) = _Meta(0, 0)
+        self._len = new_len
 
     @inline(.always)
     def write(mut self, idx: Int, var value: Self.V):
@@ -337,19 +420,18 @@ struct _Slots[V: Value](
         ]().unsafe_origin_cast[origin_of(self)]()
 
     @inline(.always)
-    def meta_ptr(self) -> Pointer[_Meta, ImmUntrackedOrigin]:
+    def slots_ptr(ref self) -> Pointer[Self.Slot, origin_of(self)]:
+        """A pointer to the slot array with the caller's origin, for
+        iterators."""
         return (
-            self.meta.unsafe_ptr()
-            .unsafe_mut_cast[False]()
-            .unsafe_origin_cast[ImmUntrackedOrigin]()
+            self._alloc.unsafe_ptr()
+            .unsafe_mut_cast[origin_of(self).mut]()
+            .unsafe_origin_cast[origin_of(self)]()
         )
 
     @inline(.always)
     def raw(self, idx: Int) -> Pointer[Self.V, MutUntrackedOrigin]:
         """An untracked pointer to slot `idx`'s value storage."""
-        return (
-            self._alloc.unsafe_ptr()
+        return Pointer(to=self._alloc.unsafe_ptr()[unsafe_offset=idx].value)
             .unsafe_mut_cast[True]()
             .unsafe_origin_cast[MutUntrackedOrigin]()
-            .unsafe_offset(idx)
-        )

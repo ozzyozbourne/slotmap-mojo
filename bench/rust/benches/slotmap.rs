@@ -4,7 +4,9 @@
 //!
 //! Every benchmark times one pass over `n` elements. Setup that must be fresh
 //! for each pass (an empty map to insert into, a full map to remove from) is
-//! excluded from the timing with `iter_batched`.
+//! excluded from the timing with `iter_batched`. `BatchSize::PerIteration`
+//! runs setup immediately before each timed pass, exactly like Mojo's
+//! `Bencher.iter_preproc`, so both languages see the same cache state.
 #![allow(deprecated)] // HopSlotMap is deprecated upstream.
 
 use std::hint::black_box;
@@ -48,7 +50,7 @@ macro_rules! primary {
                         }
                         m
                     },
-                    BatchSize::LargeInput,
+                    BatchSize::PerIteration,
                 )
             });
             group.bench_with_input(BenchmarkId::new("get", n), &n, |b, _| {
@@ -69,7 +71,7 @@ macro_rules! primary {
                         }
                         m
                     },
-                    BatchSize::LargeInput,
+                    BatchSize::PerIteration,
                 )
             });
             group.bench_with_input(BenchmarkId::new("iter_half", n), &n, |b, _| {
@@ -90,7 +92,7 @@ macro_rules! primary {
                         }
                         m
                     },
-                    BatchSize::LargeInput,
+                    BatchSize::PerIteration,
                 )
             });
         }
@@ -121,7 +123,7 @@ macro_rules! secondary {
                         }
                         m
                     },
-                    BatchSize::LargeInput,
+                    BatchSize::PerIteration,
                 )
             });
             group.bench_with_input(BenchmarkId::new("get", n), &n, |b, _| {
@@ -142,7 +144,7 @@ macro_rules! secondary {
                         }
                         m
                     },
-                    BatchSize::LargeInput,
+                    BatchSize::PerIteration,
                 )
             });
             group.bench_with_input(BenchmarkId::new("iter", n), &n, |b, _| {
