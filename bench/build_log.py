@@ -135,14 +135,14 @@ details > summary { cursor: pointer; color: var(--accent-ink); font-size: 13.5px
   <div class="tiles" id="tiles"></div>
 
   <h2>Results by round</h2>
-  <p class="note">Each bar is the CI-measured Mojo/Rust ratio of mean time per element. The axis is logarithmic so 0.5× and 2× sit at equal distance from parity. A grey tick shows the same case in the previous round that has results. Hover a bar for the raw numbers.</p>
+  <p class="note">Each bar is the CI-measured Mojo/Rust ratio of mean time per element. The axis is logarithmic so 0.5&times; and 2&times; sit at equal distance from parity. A grey tick shows the same case in the previous round that has results. Hover a bar for the raw numbers.</p>
   <div class="controls"><span class="lbl">round</span><span id="roundbtns"></span></div>
   <div class="controls"><span class="lbl">map</span><span id="mapbtns"></span></div>
   <div class="legend">
     <span style="--c:var(--good)">Mojo faster by >20%</span>
     <span style="--c:var(--accent)">within ±20% (parity)</span>
-    <span style="--c:var(--serious)">Mojo slower, up to 2×</span>
-    <span style="--c:var(--critical)">Mojo slower by more than 2×</span>
+    <span style="--c:var(--serious)">Mojo slower, up to 2&times;</span>
+    <span style="--c:var(--critical)">Mojo slower by more than 2&times;</span>
     <span style="--c:var(--muted)">previous round</span>
   </div>
   <div class="chart" id="chart"></div>
@@ -205,8 +205,8 @@ function renderTiles() {
   const tiles = [
     { k: "rounds run", v: LOG.rounds.length, s: withResults.length + " with CI results" },
     st ? { k: "cases at parity", v: Math.round(100 * st.within / st.n) + "%", s: st.within + " of " + st.n + " within ±20% (round " + last.id + ")" } : null,
-    st ? { k: "median Mojo/Rust", v: st.median.toFixed(2) + "×", s: "below 1.00 is faster than Rust" } : null,
-    st ? { k: "worst case", v: (st.worst[4] / st.worst[3]).toFixed(1) + "×", s: st.worst[0] + " " + st.worst[1] + " at " + st.worst[2].toLocaleString() } : null,
+    st ? { k: "median Mojo/Rust", v: st.median.toFixed(2) + "\u00d7", s: "below 1.00 is faster than Rust" } : null,
+    st ? { k: "worst case", v: (st.worst[4] / st.worst[3]).toFixed(1) + "\u00d7", s: st.worst[0] + " " + st.worst[1] + " at " + st.worst[2].toLocaleString() } : null,
     { k: "techniques kept", v: LOG.techniques.filter(t => t.status === "kept").length, s: LOG.techniques.filter(t => t.status !== "kept").length + " tried and left out" },
   ].filter(Boolean);
   $("#tiles").innerHTML = tiles.map(t => `<div class="tile"><div class="k">${esc(t.k)}</div><div class="v">${esc(t.v)}</div><div class="s">${esc(t.s)}</div></div>`).join("");
@@ -239,7 +239,7 @@ function renderChart() {
   let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Mojo over Rust ratio per operation for ${esc(curMap)} in round ${curRound}">`;
   ticks.forEach(t => {
     svg += `<line x1="${x(t)}" y1="${top - 6}" x2="${x(t)}" y2="${H - 26}" stroke="${t === 1 ? "var(--axis)" : "var(--grid)"}" stroke-width="${t === 1 ? 1.5 : 1}"/>`;
-    svg += `<text x="${x(t)}" y="${H - 10}" text-anchor="middle" fill="var(--muted)">${t}×</text>`;
+    svg += `<text x="${x(t)}" y="${H - 10}" text-anchor="middle" fill="var(--muted)">${t}\u00d7</text>`;
   });
   svg += `<text x="${x(1)}" y="${top - 10}" text-anchor="middle" fill="var(--ink-2)" font-size="11">parity</text>`;
   rows.forEach((r, i) => {
@@ -253,8 +253,8 @@ function renderChart() {
     svg += `<text x="${left - 10}" y="${y + rowH / 2 + 4}" text-anchor="end" fill="var(--ink)">${esc(label)}</text>`;
     svg += `<rect class="bar" x="${bx}" y="${y + 3}" width="${bw}" height="${rowH - 6}" rx="3" fill="${ratioColor(ratio)}"/>`;
     if (p) { const px = x(p[4] / p[3]); svg += `<line x1="${px}" y1="${y + 1}" x2="${px}" y2="${y + rowH - 1}" stroke="var(--muted)" stroke-width="2"/>`; }
-    svg += `<text x="${x1 + (ratio >= 1 ? 6 : -6)}" y="${y + rowH / 2 + 4}" text-anchor="${ratio >= 1 ? "start" : "end"}" fill="var(--ink-2)" font-size="11.5">${ratio.toFixed(2)}×</text>`;
-    svg += `<rect x="${left}" y="${y}" width="${W - left - right}" height="${rowH}" fill="transparent" data-tip="${esc(`${r[0]} ${r[1]} n=${r[2].toLocaleString()} · Rust ${fmt(r[3])} ns · Mojo ${fmt(r[4])} ns · ${ratio.toFixed(2)}×` + (p ? ` · was ${(p[4] / p[3]).toFixed(2)}× in round ${prev.id}` : ""))}"/>`;
+    svg += `<text x="${x1 + (ratio >= 1 ? 6 : -6)}" y="${y + rowH / 2 + 4}" text-anchor="${ratio >= 1 ? "start" : "end"}" fill="var(--ink-2)" font-size="11.5">${ratio.toFixed(2)}\u00d7</text>`;
+    svg += `<rect x="${left}" y="${y}" width="${W - left - right}" height="${rowH}" fill="transparent" data-tip="${esc(`${r[0]} ${r[1]} n=${r[2].toLocaleString()} · Rust ${fmt(r[3])} ns · Mojo ${fmt(r[4])} ns · ${ratio.toFixed(2)}\u00d7` + (p ? ` · was ${(p[4] / p[3]).toFixed(2)}\u00d7 in round ${prev.id}` : ""))}"/>`;
     svg += `</g>`;
   });
   svg += `</svg>`;
@@ -283,7 +283,7 @@ function renderTrend() {
   pts.forEach((p, i) => {
     const y = yPct(100 * p.within / p.n);
     svg += `<circle cx="${xs(i)}" cy="${y}" r="5" fill="var(--accent)" stroke="var(--surface)" stroke-width="2"/>`;
-    svg += `<text x="${xs(i)}" y="${y - 12}" text-anchor="middle" fill="var(--ink)">${Math.round(100 * p.within / p.n)}% at parity · median ${p.median.toFixed(2)}×</text>`;
+    svg += `<text x="${xs(i)}" y="${y - 12}" text-anchor="middle" fill="var(--ink)">${Math.round(100 * p.within / p.n)}% at parity · median ${p.median.toFixed(2)}\u00d7</text>`;
     svg += `<text x="${xs(i)}" y="${H - 12}" text-anchor="middle" fill="var(--ink-2)">round ${p.id} · ${esc(p.name)}</text>`;
   });
   svg += `</svg>`;
@@ -295,7 +295,7 @@ function renderRounds() {
   $("#rounds").innerHTML = LOG.rounds.map(r => {
     const st = r.rows.length ? stats(r) : null;
     return `<div class="round" id="round-${r.id}"><div class="no">${r.id}</div><div>
-      <h3>${esc(r.name)} <small>${esc(r.commit)}${r.run ? ` · <a href="${esc(r.run)}">CI run</a>` : " · CI pending"}${st ? ` · ${Math.round(100 * st.within / st.n)}% at parity, median ${st.median.toFixed(2)}×` : ""}</small></h3>
+      <h3>${esc(r.name)} <small>${esc(r.commit)}${r.run ? ` · <a href="${esc(r.run)}">CI run</a>` : " · CI pending"}${st ? ` · ${Math.round(100 * st.within / st.n)}% at parity, median ${st.median.toFixed(2)}\u00d7` : ""}</small></h3>
       <p>${esc(r.summary)}</p>
       ${r.changes.length ? `<div class="chips">${r.changes.map(c => tmap[c] ? `<a class="chip ${tmap[c].status === "kept" ? "kept" : tmap[c].status === "reverted" ? "reverted" : ""}" href="#t-${c}">${esc(tmap[c].name)}</a>` : "").join("")}</div>` : ""}
     </div></div>`;
