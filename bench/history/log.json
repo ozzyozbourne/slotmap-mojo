@@ -191,6 +191,13 @@
       "status": "kept",
       "target": "Benchmark harness",
       "detail": "The runner used to run all Rust benchmarks (about 10 minutes) and then all Mojo ones, so any drift in the runner's speed became a Rust-vs-Mojo difference. Now each map's Rust and Mojo benchmarks run back to back."
+    },
+    {
+      "id": "iter-shapes",
+      "name": "Iterator loop shapes: hints, count-down exit, no-call skip",
+      "status": "no effect",
+      "target": "SlotMap/SecondaryMap iteration (1.7x)",
+      "detail": "Tried likely/unlikely hints on the occupancy branch, a count-down exit instead of an index compare, inlining the vacant skip as a continue, and a pointer cursor. All landed between 0.55 and 0.78 ns per element. A plain `while i < n: if occupied: s += value; i += 1` loop over the same slots runs at 0.32 ns (Rust: 0.33-0.41): the compiler turns any 'scan until found, then return' shape, which is what __next__ must be, into a loop that is re-entered per element at about 2 cycles instead of 1."
     }
   ],
   "issues": [
@@ -298,6 +305,11 @@
           "round": 3,
           "title": "Codegen is otherwise on par",
           "detail": "Rust's get loop is 13 instructions, Mojo's 14; iteration 9 vs 10. Same-machine micro-benchmarks put SlotMap insert, get and remove at parity or ahead."
+        },
+        {
+          "round": 4,
+          "title": "Loop shape decides iteration speed, not instruction count",
+          "detail": "Two loops with 8 and 10 instructions per element ran at 1 and 2 cycles per element. The fast one is a single counted loop with the occupancy test as a forward skip; the slow one is what the iterator protocol produces: find the next element, return it, re-enter. No hint or cursor change altered that. The remaining 1.7x on SlotMap and SecondaryMap iteration is this, and closing it would need the compiler to fuse the consumer's loop with __next__."
         }
       ]
     },
