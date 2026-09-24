@@ -3,6 +3,8 @@
 
 Both tools report the mean time per iteration, and each iteration is one pass
 over n elements, so the table shows the mean time per element in nanoseconds.
+When a case was measured more than once (two passes per CI run), the smaller
+mean is used for each language.
 Writes results.md (also appended to $GITHUB_STEP_SUMMARY when set) and
 results.json to the output directory.
 """
@@ -21,11 +23,16 @@ OPS = ["insert", "get", "remove", "iter_half", "iter", "reinsert"]
 
 
 def rust_results(criterion_dir: Path) -> dict:
+    """Mean per element; when a case was measured twice (Criterion keeps the
+    previous run as `base`), the smaller of the two."""
     out = {}
-    for est in criterion_dir.glob("*/*/*/new/estimates.json"):
+    for est in criterion_dir.glob("*/*/*/*/estimates.json"):
+        if est.parts[-2] not in ("new", "base"):
+            continue
         map_name, op, n = est.parts[-5], est.parts[-4], est.parts[-3]
         mean_ns = json.loads(est.read_text())["mean"]["point_estimate"]
-        out[(map_name, op, int(n))] = mean_ns / int(n)
+        key = (map_name, op, int(n))
+        out[key] = min(out.get(key, float("inf")), mean_ns / int(n))
     return out
 
 
@@ -38,7 +45,9 @@ def mojo_results(csv_paths: list) -> dict:
                 if not m:
                     continue
                 n = int(m.group(3))
-                out[(m.group(1), m.group(2), n)] = float(row["met (ms)"]) * 1e6 / n
+                key = (m.group(1), m.group(2), n)
+                v = float(row["met (ms)"]) * 1e6 / n
+                out[key] = min(out.get(key, float("inf")), v)  # min over passes
     return out
 
 

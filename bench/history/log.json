@@ -68,9 +68,9 @@
       "id": 6,
       "name": "Assertions and memset",
       "commit": "cd5bcf6",
-      "run": null,
-      "results": null,
-      "summary": "Raw-pointer swap-remove for DenseSlotMap (no bounds-checked pop in the hot path), a memset for SecondaryMap's vacant extension, and benchmark closures that no longer index with a bounds check. Queued behind round 5.",
+      "run": "https://github.com/ozzyozbourne/slotmap-mojo/actions/runs/36063697311",
+      "results": "06-cd5bcf6-asserts.json",
+      "summary": "Raw-pointer swap-remove for DenseSlotMap, a memset for SecondaryMap's vacant extension, and benchmark closures without bounds-checked indexing. DenseSlotMap remove at 1K went 1.49x -> 0.91x and at 1M 0.88x -> 0.74x; SecondaryMap insert at 1K/100K went 1.1x -> 0.62x. The run also shows the noise floor: memory-bound 1M cases (SecondaryMap get, remove; dense reinsert) and 1K lookups moved up to 2x in both languages with unchanged code. From round 8 on, each CI run measures every case twice and keeps the minimum.",
       "changes": [
         "no-pop-in-hot-path",
         "memset-vacant",
@@ -88,6 +88,17 @@
         "min-growth-16",
         "cold-grow",
         "dense-insert-single-pass"
+      ]
+    },
+    {
+      "id": 8,
+      "name": "Two-pass measurement",
+      "commit": "pending",
+      "run": null,
+      "results": null,
+      "summary": "Same library code as round 7, measured with two passes per case.",
+      "changes": [
+        "two-pass-min"
       ]
     }
   ],
@@ -266,6 +277,13 @@
       "status": "kept",
       "target": "DenseSlotMap insert (1.3-1.5x)",
       "detail": "DenseSlotMap's insert appended to three lists, each append carrying its own reallocation call site inside the hot loop. With three calls that may clobber registers, the compiler spilled the loop's state to the stack on every insert. Now one branch checks capacity for all lists and calls a single never-inlined _grow(); the appends are unchecked pointer writes. Alternating runs: dense insert 5.15 -> 1.60 ns per element at 1M (Rust 4.2), 5.17 -> 1.66 at 100K (Rust 3.1). The same restructuring of HopSlotMap's insert measured no change (2.02 ns both ways) and was reverted: its loop was not spilling."
+    },
+    {
+      "id": "two-pass-min",
+      "name": "Two passes per CI run, minimum per case",
+      "status": "kept",
+      "target": "Benchmark harness",
+      "detail": "The interleaved suite runs twice inside one CI job and the comparison keeps each case's minimum for each language. A minimum is the estimator least affected by interference on a shared runner."
     }
   ],
   "issues": [
@@ -432,6 +450,11 @@
           "round": 5,
           "title": "1K-element cases wobble between runs",
           "detail": "With identical library code, SlotMap get at 1K read 1.15x, 1.28x and 1.49x across three runs while the 100K and 1M cases held within a few percent. A 1K pass is about a microsecond; treat 1K ratios as coarse and confirm them at 100K."
+        },
+        {
+          "round": 6,
+          "title": "Even a lone runner swings 2x on memory-bound cases",
+          "detail": "Rust's SecondaryMap insert at 1M read 10.1 ns in round 5 and 4.2 ns in round 6 with the same benchmark code; Mojo halved too. The DRAM-bound cases depend on which host the VM lands on. Repeating each measurement within a run and keeping the minimum per case filters this better than more samples of one pass."
         }
       ]
     },
